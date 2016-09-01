@@ -2,7 +2,7 @@
 
 char line_detection_kernel [9] = {-1, 0, 1, -1, 0, 1, -1, 0, 1} ;
 
-#define IMG_HEIGHT 320
+#define IMG_HEIGHT 240
 #define SAMPLES_FIRST_LINE 32
 #define SAMPLES_LAST_LINE 300
 #define NB_LINES_SAMPLED 32
@@ -39,12 +39,49 @@ void kernel_line(IplImage * img, char * kernel ,int * kernel_response, int v){
 }
 
 int detect_line(IplImage * img, line * l ){
-	unsigned int i ;
+	unsigned int i, j ;
 	unsigned int sample_space
 	int ** sampled_lines = malloc(NB_LINES_SAMPLED * sizeof(int*));
+	float  * line_pt = malloc(NB_LINES_SAMPLED * sizeof(float));
 	for(i = 0 ; i < NB_LINES_SAMPLED ; i ++){
 		sampled_lines[i] = malloc(img->width*sizeof(int));
 		kernel_line(img, line_detection_kernel ,int * (sampled_lines[i], (SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE)));
+		int max=0, min=0, max_index, min_index, sig = 0 ;		
+		for(j = 1 ; j < (img->width - 1) ; j ++){
+			if(sampled_lines[i][j] > max){
+				if(sig == 1){
+					sig = 0 ;
+					min = 0	;			
+				}
+				if(min > 0){ //we have a signature ...
+					max = sampled_lines[i][j] ;
+					max_index = j ;
+					sig = 1 ;			
+				}else{
+					max = sampled_lines[i][j] ;
+					max_index = j ;
+				}			
+			}
+			if(sampled_lines[i][j] < min){
+				if(sig == 1){ // Not sure this will work ...
+					sig = 0 ;
+					max = 0	;			
+				}
+				if(max > 0){
+					min = sampled_lines[i][j] ;
+					min_index = j ;
+					sig = 1 ;
+				}else{
+					min = sampled_lines[i][j];
+					min_index = j ;
+				}			
+			}
+		}
+		if(sig == 1){
+			line_pt[i] = (max_index + min_index)/2. ;
+		}else{
+			line_pt[i] = -1 ; //not found ...		
+		}
 	}
 	//We approximate by a three degree polynom
 	//We use triplet of points to compute the coefficients,  	
