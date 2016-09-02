@@ -1,12 +1,32 @@
+LDFLAGS=-lm
+CFLAGS=-O3 -mfpu=neon -Iinc/ 
 
-CFLAGS=-Wall -O3
-LDFLAGS=-pthread -lpigpio -lrt
+EXEC_NAME=detect_line
 
-%o: %c
-	gcc -c $(CFLAGS) $< -o $@
+SRC_DIR=src/
 
-servo_control : servo_control.o
-	gcc $(CFLAGS) -o $@ $< $(LDFLAGS)
+OBJS_DIR=build/
 
-clean:
-	rm *.o servo_control
+SRC_FILES=$(shell ls ${SRC_DIR})
+
+OBJ_FILES=$(SRC_FILES:.c=.o) \
+	$(LIB_FILES:.c=.o) 
+
+OBJS=$(addprefix ${OBJS_DIR},${OBJ_FILES})
+
+all : ${EXEC_NAME}
+
+clean :
+	rm -Rf ${OBJS_DIR} radar
+	
+${EXEC_NAME} : ${OBJS}
+	gcc -o $@ ${OBJS} ${LDFLAGS}
+
+${OBJS_DIR}%.o : ${SRC_DIR}%.c
+	mkdir -p ${OBJS_DIR}
+	gcc ${CFLAGS} -c $< -o $@
+
+${OBJS_DIR}%.o : ${LIB_DIR}%.c
+	mkdir -p ${OBJS_DIR}
+	gcc ${CFLAGS} -c $< -o $@
+
