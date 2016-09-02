@@ -50,9 +50,9 @@ void kernel_line(IplImage * img, char * kernel, int * kernel_response, int v) {
 	kernel_response[i] = 0;
 }
 
-#define RANSAC_LIST POLY_LENGTH
+#define RANSAC_LIST (POLY_LENGTH)
 #define RANSAC_NB_TEST 5
-#define RANSAC_INLIER_LIMIT 1.5
+#define RANSAC_INLIER_LIMIT 2.0
 
 float detect_line(IplImage * img, curve * l, float * pts) {
 	unsigned int i, j;
@@ -66,22 +66,23 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 
 		for (j = 1; j < (img->width - 1); j++) {
 			//printf("%d ", sampled_lines[i][j]);
-			if (sampled_lines[j] > max) {
-				if (min < 0) { //we have a signature ...
-					max = sampled_lines[j];
-					max_index = j;
+			//Track is white on black, so we expect maximum gradient then minimum
+			if (sampled_lines[j] < min) {
+				if (max > 0) { //we have a signature ...
+					min = sampled_lines[j];
+					min_index = j;
 					sig = 1;
 				}
 			}
-			if (sampled_lines[j] < min) {
-				if (max > 0) {
-					max = 0;
-					min = sampled_lines[j];
-					min_index = j;
+			if (sampled_lines[j] > max) {
+				if (min > 0) {
+					min = 0;
+					max = sampled_lines[j];
+					max_index = j;
 					sig = 0;
 				} else {
-					min = sampled_lines[j];
-					min_index = j;
+					max = sampled_lines[j];
+					max_index = j;
 				}
 			}
 		}
@@ -94,12 +95,12 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 		//printf("\n");
 	}
 	free(sampled_lines);
-	//TODO : for each detected point, compute its projection in the world frame
+	//TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
 
 	float * x = malloc(RANSAC_LIST * sizeof(float));
 	float * y = malloc(RANSAC_LIST * sizeof(float));
 	char * used = malloc(NB_LINES_SAMPLED * sizeof(char));
-	float fct_params[3];
+	float fct_params[POLY_LENGTH];
 	//Need to execute in a RANSAC way
 	int max_consensus = 0;
 	for (i = 0; i < RANSAC_NB_TEST; i++) {
@@ -107,22 +108,27 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 		int nb_consensus = 0;
 		int nb_tests = 0;
 		int idx;
-		float max_x_temp = 0 ;
-		float min_x_temp = img->width ;
+		float max_x_temp = 0;
+		float min_x_temp = img->width;
 		memset(used, 0, NB_LINES_SAMPLED * sizeof(char)); //zero used index
 		while (pt_index < RANSAC_LIST) {
-			idx = rand_a_b(0, NB_LINES_SAMPLED);
-			int closest_neighbour = NB_LINES_SAMPLED ;
-			for(j = 0  ; j < NB_LINES_SAMPLED ; j ++){
-				if(used[j] == 1 && abs(j - idx) < closest_neighbour){
-					closest_neighbour = abs(j - idx) ;
+			idx = rand_a_b(0, NB_LINES_SAMPLED + 1);
+			if (used[idx] != 0 || pts[idx] < 0. || idx >= NB_LINES_SAMPLED)
+				continue;
+			int closest_neighbour = NB_LINES_SAMPLED;
+			for (j = 0; j < NB_LINES_SAMPLED; j++) {
+				int idx_to_test = (idx + j) % NB_LINES_SAMPLED;
+				if (used[idx_to_test] == 1
+						&& abs(idx_to_test - idx) < closest_neighbour) {
+					closest_neighbour = abs(idx_to_test - idx);
 				}
 			}
 
-			if (used[idx] == 0 && pts[idx] > 0. && closest_neighbour > 3) {
+			if (closest_neighbour > 1) {
 				y[pt_index] = (SAMPLES_FIRST_LINE + idx * (SAMPLES_SPACE));
 				x[pt_index] = pts[idx];
-				if(x[pt_index] > max_x_temp) max_x_temp = x[pt_index]  ;
+				if (x[pt_index] > max_x_temp)
+					max_x_temp = x[pt_index];
 				used[idx] = 1;
 				pt_index++;
 				nb_tests++;
@@ -142,16 +148,18 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 				resp += fct_params[j] * pow(pts[idx], j);
 			}
 			float error = abs(resp - idx_y);
-			if (error < RANSAC_INLIER_LIMIT){
+			if (error < RANSAC_INLIER_LIMIT) {
 				nb_consensus++;
-				if(pts[idx] > max_x_temp) max_x_temp = pts[idx]  ;
-				if(pts[idx] < min_x_temp) min_x_temp = pts[idx]  ;
+				if (pts[idx] > max_x_temp)
+					max_x_temp = pts[idx];
+				if (pts[idx] < min_x_temp)
+					min_x_temp = pts[idx];
 			}
 			if (nb_consensus > max_consensus) {
 				max_consensus = nb_consensus;
 				memcpy(l->p, fct_params, POLY_LENGTH * sizeof(float));
-				l->max_x = max_x_temp ;
-				l->min_x = min_x_temp ;
+				l->max_x = max_x_temp;
+				l->min_x = min_x_temp;
 			}
 			nb_tests++;
 			if (nb_tests >= nb_pts) {
@@ -160,15 +168,39 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 		}
 
 	}
+
+	//trying to use first last and middle point ...
+
+	/*y[0] = (SAMPLES_FIRST_LINE);
+	 x[0] = pts[0];
+	 y[1] = (SAMPLES_FIRST_LINE+(NB_LINES_SAMPLED-1)*SAMPLES_SPACE);
+	 x[1] = pts[NB_LINES_SAMPLED-1];
+	 y[2] = (SAMPLES_FIRST_LINE+(NB_LINES_SAMPLED/2)*SAMPLES_SPACE);
+	 x[2] = pts[NB_LINES_SAMPLED/2] ;
+	 compute_interpolation(x, y, l->p, POLY_LENGTH, 3);
+	 l->min_x = pts[NB_LINES_SAMPLED-1] ;
+	 l->max_x = pts[0];*/
+
 	printf("Max consensus %d \n", (max_consensus + RANSAC_LIST));
 	printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
+
 	free(x);
 	free(y);
 	free(used);
 	float confidence = ((float) (max_consensus + RANSAC_LIST))
 			/ ((float) NB_LINES_SAMPLED);
 	printf("Confidence %f \n", confidence);
+
 	return confidence;
+}
+
+float steering_from_curve(curve * c, float * s) {
+	float x_lookahead, y_lookahead;
+
+	float D_square = pow(x_lookahead, 2) + pow(y_lookahead, 2);
+	float r = D_square / (2.0 * x_lookahead);
+	float curvature = 1.0 / r;
+	return curvature;
 }
 
 //Compute the line equation in the ground plane (need a calibrated camera system ...)
