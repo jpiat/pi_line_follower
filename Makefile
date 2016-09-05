@@ -1,5 +1,5 @@
-LDFLAGS=-lm
-CFLAGS=-O3 -mfpu=neon -Iinc/ 
+LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
+CFLAGS=-O3 -DDEBUG -Iinc/ 
 
 EXEC_NAME=detect_line
 

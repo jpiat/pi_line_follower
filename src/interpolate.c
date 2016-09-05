@@ -21,6 +21,7 @@ int svdcmp(float *a, int nRows, int nCols, float *w, float *v);
 // prints an arbitrary size matrix to the standard output
 void printMatrix(float *a, int rows, int cols);
 void printMatrix(float *a, int rows, int cols) {
+#ifdef DEBUG
 	int i, j;
 	printf("[");
 	for (i = 0; i < rows; i++) {
@@ -31,6 +32,7 @@ void printMatrix(float *a, int rows, int cols) {
 	}
 	printf(" ]");
 	printf("\n");
+#endif
 }
 
 // calculates sqrt( a^2 + b^2 ) with decent precision
@@ -143,8 +145,8 @@ int svdcmp(float *a, int nRows, int nCols, float *w, float *v) {
 		}
 		anorm = FMAX(anorm, (fabs(w[i]) + fabs(rv1[i])));
 
-		printf(".");
-		fflush(stdout);
+		/*printf(".");
+		fflush(stdout);*/
 	}
 
 	for (i = nCols - 1; i >= 0; i--) {
@@ -166,8 +168,8 @@ int svdcmp(float *a, int nRows, int nCols, float *w, float *v) {
 		MAT_ELT(v, i, i, nCols) = 1.0;
 		g = rv1[i];
 		l = i;
-		printf(".");
-		fflush(stdout);
+		/*printf(".");
+		fflush(stdout);*/
 	}
 
 	for (i = IMIN(nRows,nCols) - 1; i >= 0; i--) {
@@ -190,8 +192,8 @@ int svdcmp(float *a, int nRows, int nCols, float *w, float *v) {
 			for (j = i; j < nRows; j++)
 				MAT_ELT(a, j, i, nCols) = 0.0;
 		++MAT_ELT(a, i, i, nCols);
-		printf(".");
-		fflush(stdout);
+		/*printf(".");
+		fflush(stdout);*/
 	}
 
 	for (k = nCols - 1; k >= 0; k--) {
@@ -288,10 +290,10 @@ int svdcmp(float *a, int nRows, int nCols, float *w, float *v) {
 			rv1[k] = f;
 			w[k] = x;
 		}
-		printf(".");
-		fflush(stdout);
+		/*printf(".");
+		fflush(stdout);*/
 	}
-	printf("\n");
+	//printf("\n");
 
 	free(rv1);
 
@@ -380,13 +382,13 @@ void compute_interpolation(float * x, float * y , float * params, int nb_params,
 		rminusrd[i] = y[i];
 	}
 	//compute pseudo inverse of RdTRd
-	printMatrix(Rd, nb_samples, nb_params);
-	printMatrix(rminusrd, nb_samples, 1);
+	/*printMatrix(Rd, nb_samples, nb_params);
+	printMatrix(rminusrd, nb_samples, 1);*/
 	pseudo_inverse(Rd, Rd_inv, nb_params, nb_samples);
 	//printMatrix(Rd_inv, nb_undistort_params, nb_samples);
 	float_mat_product(Rd_inv, rminusrd, params, nb_samples,
 			nb_params, 1, nb_samples);
-	printMatrix(params, nb_params, 1);
+	//printMatrix(params, nb_params, 1);
 	float max_error = 0.0;
 	float sum_error = 0.0;
 	for (i = 0; i < nb_samples; i++) {

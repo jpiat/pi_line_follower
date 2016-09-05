@@ -1,8 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include "opencv2/highgui/highgui_c.h"
 #include "opencv2/core/core_c.h"
 #include "opencv2/core/types_c.h"
 #include "opencv2/imgproc/imgproc_c.h"
-
 #include "interpolate.h"
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
@@ -50,49 +53,32 @@ void kernel_line(IplImage * img, char * kernel, int * kernel_response, int v) {
 	kernel_response[i] = 0;
 }
 
+void kernel_horiz(IplImage * img, int * kernel_response, int v) {
+	unsigned int i;
+	kernel_response[0] = 0;
+	unsigned char * upixel_ptr = (unsigned char *) img->imageData;
+	for (i = 1; i < (img->width - 1); i++) {
+		int response = 0;
+		response -= upixel_ptr[(v - 1) * img->widthStep + (i - 1)];
+		response -= upixel_ptr[(v) * img->widthStep + (i - 1)];
+		response -= upixel_ptr[(v + 1) * img->widthStep + (i - 1)];
+
+		response += upixel_ptr[(v - 1) * img->widthStep + (i + 1)];
+		response += upixel_ptr[(v) * img->widthStep + (i + 1)];
+		response += upixel_ptr[(v + 1) * img->widthStep + (i + 1)];
+
+		kernel_response[i] = response;
+
+	}
+	kernel_response[i] = 0;
+}
+
 #define RANSAC_LIST (POLY_LENGTH)
-#define RANSAC_NB_TEST 5
+#define RANSAC_NB_TEST 8
 #define RANSAC_INLIER_LIMIT 4.0
 #define NB_RANSAC_TESTS 8
-float detect_line(IplImage * img, curve * l, float * pts) {
-	unsigned int i, j;
-	int nb_pts = 0;
-	int * sampled_lines = malloc(img->width * sizeof(int));
-	for (i = 0; i < NB_LINES_SAMPLED; i++) {
-		kernel_line(img, line_detection_kernel, sampled_lines,
-				(SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE)));
-		int max = 0, min = 0, max_index, min_index, sig = 0;
-		for (j = 1; j < (img->width - 1); j++) {
-			//Track is white on black, so we expect maximum gradient then minimum
-			if (sampled_lines[j] < min) {
-				if (max > 0) { //we have a signature ...
-					min = sampled_lines[j];
-					min_index = j;
-					sig = 1;
-				}
-			}
-			if (sampled_lines[j] > max) {
-				if (min > 0) {
-					min = 0;
-					max = sampled_lines[j];
-					max_index = j;
-					sig = 0;
-				} else {
-					max = sampled_lines[j];
-					max_index = j;
-				}
-			}
-		}
-		if (sig == 1) {
-			pts[i] = ((float) (max_index + min_index)) / 2.;
-			nb_pts++;
-		} else {
-			pts[i] = -1; //not found ...
-		}
-	}
-	free(sampled_lines);
-	//TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
-
+float fit_line(float * pts, unsigned int nb_pts, curve * l) {
+	int i, j;
 	float * x = malloc(nb_pts * sizeof(float));
 	float * y = malloc(nb_pts * sizeof(float));
 	char * used = malloc(NB_LINES_SAMPLED * sizeof(char));
@@ -106,7 +92,7 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 		int nb_tests = 0;
 		int idx;
 		float max_x_temp = 0;
-		float min_x_temp = img->width;
+		float min_x_temp = 3000.; //arbitrary ...
 		memset(used, 0, NB_LINES_SAMPLED * sizeof(char)); //zero used index
 		while (pt_index < RANSAC_LIST) {
 			//Select set of samples, with distance constraint
@@ -200,6 +186,52 @@ float detect_line(IplImage * img, curve * l, float * pts) {
 	return confidence;
 }
 
+float detect_line(IplImage * img, curve * l, float * pts) {
+	unsigned int i, j;
+	int nb_pts = 0;
+	int * sampled_lines = malloc(img->width * sizeof(int));
+	srand(time(NULL));
+	for (i = 0; i < NB_LINES_SAMPLED; i++) {
+		/*kernel_line(img, line_detection_kernel, sampled_lines,
+		 (SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE)));*/
+		kernel_horiz(img, sampled_lines,
+				(SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE)));
+		int max = 0, min = 0, max_index, min_index, sig = 0;
+		for (j = 1; j < (img->width - 1); j++) {
+			//Track is white on black, so we expect maximum gradient then minimum
+			if (sampled_lines[j] < min) {
+				if (max > 0) { //we have a signature ...
+					min = sampled_lines[j];
+					min_index = j;
+					sig = 1;
+				}
+			}
+			if (sampled_lines[j] > max) {
+				if (min > 0) {
+					min = 0;
+					max = sampled_lines[j];
+					max_index = j;
+					sig = 0;
+				} else {
+					max = sampled_lines[j];
+					max_index = j;
+				}
+			}
+		}
+		if (sig == 1) {
+			pts[i] = ((float) (max_index + min_index)) / 2.;
+			nb_pts++;
+		} else {
+			pts[i] = -1; //not found ...
+		}
+	}
+	free(sampled_lines);
+	return fit_line(pts, nb_pts, l);
+	//TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
+	//
+
+}
+
 float steering_from_curve(curve * c, float * s) {
 	float x_lookahead, y_lookahead;
 
@@ -221,7 +253,11 @@ int main(void) {
 			cvLoadImage(
 					"/home/jpiat/development/SOFTWARE/pi_line_follower/img_test/curve_view.png",
 					CV_LOAD_IMAGE_GRAYSCALE);
+	init_profile(0);
+	start_profile(0);
 	detect_line(line_image, &detected, pts);
+	end_profile(0);
+	print_profile_time("Took :", 0);
 	for (i = 0; i < NB_LINES_SAMPLED; i++) {
 		cvLine(line_image,
 				cvPoint(0, (SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE))),
