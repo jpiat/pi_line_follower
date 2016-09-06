@@ -351,7 +351,7 @@ void pseudo_inverse(float * a, float * a_inv, int nCols, int nRows) {
 			MAT_ELT(vw, i, j, nCols) = w[j] * MAT_ELT(v, i, j, nCols);
 		}
 	}
-	printMatrix(vw, nCols, nCols);
+	//printMatrix(vw, nCols, nCols);
 	//a_inv = vW*Ut
 	transpose(a_copy, Ut, nCols, nRows);
 	float_mat_product(vw, Ut, a_inv, nCols, nCols, nRows, nCols);
