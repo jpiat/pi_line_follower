@@ -1,5 +1,5 @@
-LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
-CFLAGS=-O3 -DDEBUG -Iinc/ 
+LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lpigpio
+CFLAGS=-O3 -DDEBUG -Iinc/ -mfpu=vfp
 
 EXEC_NAME=detect_line
 

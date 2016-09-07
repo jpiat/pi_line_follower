@@ -326,7 +326,7 @@ float steering_from_curve(curve * c, float x_lookahead) {
 	return curvature;
 }
 
-int main(int argc, char ** argv) {
+int detect_line_test(int argc, char ** argv) {
 	int i, nb_pts;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
