@@ -140,7 +140,7 @@ float distance_to_curve(curve * l, float x, float y) {
 }
 
 #define RANSAC_LIST (POLY_LENGTH)
-#define RANSAC_NB_LOOPS 4
+#define RANSAC_NB_LOOPS 10
 #define RANSAC_INLIER_LIMIT 8.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i, j;
@@ -160,7 +160,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 		memset(used, 0, NB_LINES_SAMPLED * sizeof(char)); //zero used index
 		while (pt_index < RANSAC_LIST) {
 			//Select set of samples, with distance constraint
-			idx = rand_a_b(0, (nb_pts-1));
+			idx = rand_a_b(0, (nb_pts - 1));
 			while (used[idx] != 0)
 				idx = (idx + 1) % NB_LINES_SAMPLED;
 			//continue;
@@ -243,8 +243,8 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	free(inliers);
 	free(max_inliers);
 	/*printf("Max consensus %d \n", max_consensus);
-	printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
-*/
+	 printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
+	 */
 	float confidence = ((float) (max_consensus + RANSAC_LIST))
 			/ ((float) NB_LINES_SAMPLED);
 	//printf("Confidence %f \n", confidence);
@@ -294,10 +294,19 @@ float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 		}
 	}
 	free(sampled_lines);
-	if((*nb_pts) > 6){
-	return fit_line(pts, (*nb_pts), l);
-	}else{
-		return 0. ;
+	//project all points in robot frame before fiting
+	//
+	for(i = 0 ; i < (*nb_pts) ; i ++){
+		float t = pts[i].x;
+		pts[i].x = pts[i].y ;
+		pts[i].y = t ;
+	}
+
+
+	if ((*nb_pts) > (POLY_LENGTH * 2)) {
+		return fit_line(pts, (*nb_pts), l);
+	} else {
+		return 0.;
 	}
 	//return 0.;
 //TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
@@ -305,9 +314,12 @@ float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 
 }
 
-float steering_from_curve(curve * c, float * s) {
-	float x_lookahead, y_lookahead;
-
+float steering_from_curve(curve * c, float x_lookahead) {
+	float  y_lookahead = 0;
+	int i;
+	for (i = 0; i < POLY_LENGTH; i++) {
+		y_lookahead += c->p[i] * pow(x_lookahead, i);
+	}
 	float D_square = pow(x_lookahead, 2) + pow(y_lookahead, 2);
 	float r = D_square / (2.0 * x_lookahead);
 	float curvature = 1.0 / r;
@@ -318,35 +330,34 @@ int main(int argc, char ** argv) {
 	int i, nb_pts;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
-	if(argc < 2){
+	if (argc < 2) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
-	IplImage * line_image =
-			cvLoadImage(
-					argv[1],
-					CV_LOAD_IMAGE_GRAYSCALE);
+	IplImage * line_image = cvLoadImage(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 	init_profile(0);
 	start_profile(0);
 	detect_line(line_image, &detected, pts, &nb_pts);
 	end_profile(0);
 	print_profile_time("Took :", 0);
+	//there is a pi/2 rotation on Z
 	for (i = 0; i < nb_pts; i++) {
-		cvLine(line_image, cvPoint(0, pts[i].y),
-				cvPoint(line_image->width - 1, pts[i].y),
+		cvLine(line_image, cvPoint(0, pts[i].x),
+				cvPoint(line_image->width - 1, pts[i].x),
 				cvScalar(255, 255, 255, 0), 1, 8, 0);
-		cvCircle(line_image, cvPoint((int) (pts[i].x), (int) (pts[i].y)), 4,
+		cvCircle(line_image, cvPoint((int) (pts[i].y), (int) (pts[i].x)), 4,
 				cvScalar(0, 0, 0, 0), 4, 8, 0);
 	}
 
-	for (i = 0; i < line_image->width; i += 10) {
+
+	for (i = 0; i < line_image->height; i += 10) {
 		float resp1 = 0., resp2 = 0.;
 		int j;
 		for (j = 0; j < POLY_LENGTH; j++) {
 			resp1 += detected.p[j] * pow(i, j);
 			resp2 += detected.p[j] * pow((i + 10), j);
 		}
-		cvLine(line_image, cvPoint(i, resp1), cvPoint(i + 10, resp2),
+		cvLine(line_image, cvPoint(resp1, i), cvPoint(resp2, i + 10),
 				cvScalar(0, 0, 0, 0), 1, 8, 0);
 	}
 
