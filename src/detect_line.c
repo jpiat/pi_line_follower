@@ -252,7 +252,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	return confidence;
 }
 
-#define SCORE_THRESHOLD 1000
+#define SCORE_THRESHOLD 200
 #define WIDTH_THRESHOLD 100
 float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 	unsigned int i, j;
@@ -294,7 +294,12 @@ float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 		}
 	}
 	free(sampled_lines);
+	if((*nb_pts) > 6){
 	return fit_line(pts, (*nb_pts), l);
+	}else{
+		return 0. ;
+	}
+	//return 0.;
 //TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
 //
 
@@ -309,17 +314,17 @@ float steering_from_curve(curve * c, float * s) {
 	return curvature;
 }
 
-//Compute the line equation in the ground plane (need a calibrated camera system ...)
-//Compute an interception curve in the ground plane
-//Compute steering from interception curve and apply to vehicle (compute speed based on steering to avoid drift)
-
-int main(void) {
+int main(int argc, char ** argv) {
 	int i, nb_pts;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
+	if(argc < 2){
+		printf("Requires image path \n");
+		exit(-1);
+	}
 	IplImage * line_image =
 			cvLoadImage(
-					"/home/jpiat/development/SOFTWARE/pi_line_follower/img_test/curve_view_top_left.png",
+					argv[1],
 					CV_LOAD_IMAGE_GRAYSCALE);
 	init_profile(0);
 	start_profile(0);
@@ -334,7 +339,7 @@ int main(void) {
 				cvScalar(0, 0, 0, 0), 4, 8, 0);
 	}
 
-	for (i = 0; i < line_image->width/*i <= detected.max_x*/; i += 10) {
+	for (i = 0; i < line_image->width; i += 10) {
 		float resp1 = 0., resp2 = 0.;
 		int j;
 		for (j = 0; j < POLY_LENGTH; j++) {
