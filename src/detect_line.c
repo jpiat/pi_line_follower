@@ -6,10 +6,8 @@
 #include "profile.h"
 #include "detect_line.h"
 
-double K_cam[9] = { 674.148669, 0, 312.668285, 0, 674.148669, 223.832270, 0, 0,
-		1. };
-double H_bird_eye[] = { 674.148669, 312.668285, 0.000000, 0.000000, 223.832270,
-		674.148669, 0.000000, 1.000000, 0.000000, -1.225344, 2.641982 };
+double cam_1_Ct[12] ;
+
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
@@ -25,9 +23,8 @@ float rand_a_b(int a, int b) {
 	return (rand_0_1 * (b - a)) + a;
 }
 
-void calc_ct_and_H(double * world_to_cam, double * K, double *Ct, double * H) {
+void calc_ct(double * world_to_cam, double * K, double *Ct) {
 	int i, j, k;
-
 	//Ct = K*Wc
 	for (k = 0; k < 4; k++) {
 		for (i = 0; i < 3; i++) {
@@ -37,16 +34,6 @@ void calc_ct_and_H(double * world_to_cam, double * K, double *Ct, double * H) {
 			}
 		}
 	}
-
-	H[0] = Ct[0];
-	H[1] = Ct[1];
-	H[2] = Ct[3];
-	H[3] = Ct[4];
-	H[4] = Ct[5];
-	H[5] = Ct[7];
-	H[6] = Ct[8];
-	H[7] = Ct[9];
-	H[8] = Ct[11];
 }
 
 #define MAT_ELT_AT(A, c, y, x) A[((y)*(c))+x]
@@ -74,8 +61,6 @@ void pixel_to_ground_plane(double * Ct, double u, double v, double * x,
 	(*x) = (d1 - ((*y) * b1)) / a1;
 
 }
-
-
 
 void kernel_line(IplImage * img, char * kernel, int * kernel_response, int v) {
 	unsigned int i;
@@ -283,26 +268,28 @@ float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 	free(sampled_lines);
 	//project all points in robot frame before fiting
 	//
-	for(i = 0 ; i < (*nb_pts) ; i ++){
+	/*for (i = 0; i < (*nb_pts); i++) {
+		pixel_to_ground_plane(cam_1_Ct, pts[i].x, pts[i].y, &(pts[i].x), &(pts[i].y));
+	}*/
+	for (i = 0; i < (*nb_pts); i++) {
 		float t = pts[i].x;
-		pts[i].x = pts[i].y ;
-		pts[i].y = t ;
+		pts[i].x = pts[i].y;
+		pts[i].y = t;
 	}
-
 
 	if ((*nb_pts) > (POLY_LENGTH * 2)) {
 		return fit_line(pts, (*nb_pts), l);
 	} else {
 		return 0.;
 	}
-	//return 0.;
+//return 0.;
 //TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
 //
 
 }
 
 float steering_from_curve(curve * c, float x_lookahead) {
-	float  y_lookahead = 0;
+	float y_lookahead = 0;
 	int i;
 	for (i = 0; i < POLY_LENGTH; i++) {
 		y_lookahead += c->p[i] * pow(x_lookahead, i);
@@ -327,7 +314,7 @@ int detect_line_test(int argc, char ** argv) {
 	detect_line(line_image, &detected, pts, &nb_pts);
 	end_profile(0);
 	print_profile_time("Took :", 0);
-	//there is a pi/2 rotation on Z
+//there is a pi/2 rotation on Z
 	for (i = 0; i < nb_pts; i++) {
 		cvLine(line_image, cvPoint(0, pts[i].x),
 				cvPoint(line_image->width - 1, pts[i].x),
@@ -335,7 +322,6 @@ int detect_line_test(int argc, char ** argv) {
 		cvCircle(line_image, cvPoint((int) (pts[i].y), (int) (pts[i].x)), 4,
 				cvScalar(0, 0, 0, 0), 4, 8, 0);
 	}
-
 
 	for (i = 0; i < line_image->height; i += 10) {
 		float resp1 = 0., resp2 = 0.;
