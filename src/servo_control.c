@@ -17,7 +17,7 @@
 #define CENTER_SERVO 1500
 #define MAX_SERVO 2000
 
-int main(void){
+int test_servo(void){
 	int i  ;
 	if (gpioInitialise() < 0)
 	{

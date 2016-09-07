@@ -140,7 +140,7 @@ float distance_to_curve(curve * l, float x, float y) {
 }
 
 #define RANSAC_LIST (POLY_LENGTH)
-#define RANSAC_NB_LOOPS 4
+#define RANSAC_NB_LOOPS 10
 #define RANSAC_INLIER_LIMIT 8.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i, j;
@@ -314,7 +314,7 @@ float steering_from_curve(curve * c, float * s) {
 	return curvature;
 }
 
-int main(int argc, char ** argv) {
+int detect_line_test(int argc, char ** argv) {
 	int i, nb_pts;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
