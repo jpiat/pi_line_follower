@@ -2,16 +2,13 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "opencv2/highgui/highgui_c.h"
-#include "opencv2/core/core_c.h"
-#include "opencv2/core/types_c.h"
-#include "opencv2/imgproc/imgproc_c.h"
 #include "interpolate.h"
 #include "profile.h"
+#include "detect_line.h"
 
 double K_cam[9] = { 674.148669, 0, 312.668285, 0, 674.148669, 223.832270, 0, 0,
 		1. };
-double H_bird_eye[9] = { 674.148669, 312.668285, 0.000000, 0.000000, 223.832270,
+double H_bird_eye[] = { 674.148669, 312.668285, 0.000000, 0.000000, 223.832270,
 		674.148669, 0.000000, 1.000000, 0.000000, -1.225344, 2.641982 };
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
@@ -78,17 +75,7 @@ void pixel_to_ground_plane(double * Ct, double u, double v, double * x,
 
 }
 
-#define POLY_LENGTH 3
-typedef struct curve {
-	float p[POLY_LENGTH];
-	float max_x;
-	float min_x;
-} curve;
 
-typedef struct point {
-	float x;
-	float y;
-} point;
 
 void kernel_line(IplImage * img, char * kernel, int * kernel_response, int v) {
 	unsigned int i;

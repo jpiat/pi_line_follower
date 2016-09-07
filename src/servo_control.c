@@ -17,27 +17,33 @@
 #define CENTER_SERVO 1500
 #define MAX_SERVO 2000
 
-int test_servo(void){
-	int i  ;
-	if (gpioInitialise() < 0)
-	{
-  	printf("Cannot initialise GPIO \n");
-	exit(-1);
-	 // pigpio initialisation failed.
-	}
+void arm_esc() {
 	gpioServo(ESC, ARM_ESC);
-	printf("Arming ESC \n");
 	sleep(2);
-	for(i = MIN_SERVO ; i < MAX_SERVO ; i +=10){
-		gpioServo(SERVO, i);
-		usleep(50000);
-	}
-	/*
-	for(i = MIN_ESC ; i < MAX_ESC ; i +=10){
-                gpioServo(ESC, i);
-                usleep(50000);
-        }*/
+}
 
+void set_esc_speed(float speed) {
+	float cmd = CENTER_ESC + ((MAX_ESC - CENTER_ESC) * speed);
+	gpioServo(ESC, (unsigned int) cmd);
+}
+
+void set_servo_angle(float angle) {
+	float cmd = CENTER_SERVO + ((MAX_SERVO - CENTER_SERVO) * angle);
+	gpioServo(ESC, (unsigned int) cmd);
+}
+
+int test_servo(void) {
+	float i;
+	if (gpioInitialise() < 0) {
+		printf("Cannot initialise GPIO \n");
+		exit(-1);
+		// pigpio initialisation failed.
+	}
+	printf("Arming ESC \n");
+	arm_esc();
+	for (i = -1.0; i < 1.0; i += 0.1) {
+		set_servo_angle(i);
+	}
 	gpioTerminate();
-	return 1 ;
+	return 1;
 }
