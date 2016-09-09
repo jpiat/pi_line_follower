@@ -4,10 +4,11 @@
 
 #include "interpolate.h"
 #include "profile.h"
+#include "resampling.h"
 #include "detect_line.h"
 
-double cam_1_Ct[12] ;
-
+#include "camera_parameters.h"
+//Needds to be computed from camera calibration results using resampling.c
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
@@ -21,45 +22,6 @@ float rand_a_b(int a, int b) {
 	//return ((rand() % (b - a) + a;
 	float rand_0_1 = (((float) rand()) / ((float) RAND_MAX));
 	return (rand_0_1 * (b - a)) + a;
-}
-
-void calc_ct(double * world_to_cam, double * K, double *Ct) {
-	int i, j, k;
-	//Ct = K*Wc
-	for (k = 0; k < 4; k++) {
-		for (i = 0; i < 3; i++) {
-			Ct[(i * 4) + k] = 0;
-			for (j = 0; j < 3; j++) {
-				Ct[(i * 4) + k] += K[(i * 3) + j] * world_to_cam[(j * 4) + k];
-			}
-		}
-	}
-}
-
-#define MAT_ELT_AT(A, c, y, x) A[((y)*(c))+x]
-void pixel_to_ground_plane(double * Ct, double u, double v, double * x,
-		double * y) {
-
-	//Pose inverse par développement des équations du modèle
-
-	double a1 = MAT_ELT_AT(Ct, 4, 0, 0)- u * MAT_ELT_AT(Ct, 4, 2, 0);
-	double b1 = MAT_ELT_AT(Ct, 4, 0, 1) - u * MAT_ELT_AT(Ct, 4, 2, 1);
-	double c1 = MAT_ELT_AT(Ct, 4, 0, 2) - u * MAT_ELT_AT(Ct, 4, 2, 2);
-
-	double a2 = MAT_ELT_AT(Ct, 4, 1, 0) - v * MAT_ELT_AT(Ct, 4, 2, 0);
-	double b2 = MAT_ELT_AT(Ct, 4, 1, 1) - v * MAT_ELT_AT(Ct, 4, 2, 1);
-	double c2 = MAT_ELT_AT(Ct, 4, 1, 2) - v * MAT_ELT_AT(Ct, 4, 2, 2);
-
-	double d1 = -(MAT_ELT_AT(Ct, 4, 0, 3) - u * MAT_ELT_AT(Ct, 4, 2, 3));
-	double d2 = -(MAT_ELT_AT(Ct, 4, 1, 3) - v * MAT_ELT_AT(Ct, 4, 2, 3));
-
-	double b3 = a2 * b1 - a1 * b2;
-	double c3 = a2 * c1 - a1 * c2;
-	double d3 = a2 * d1 - a1 * d2;
-
-	(*y) = d3 / b3;
-	(*x) = (d1 - ((*y) * b1)) / a1;
-
 }
 
 void kernel_line(IplImage * img, char * kernel, int * kernel_response, int v) {
@@ -268,13 +230,9 @@ float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 	free(sampled_lines);
 	//project all points in robot frame before fiting
 	//
-	/*for (i = 0; i < (*nb_pts); i++) {
-		pixel_to_ground_plane(cam_1_Ct, pts[i].x, pts[i].y, &(pts[i].x), &(pts[i].y));
-	}*/
 	for (i = 0; i < (*nb_pts); i++) {
-		float t = pts[i].x;
-		pts[i].x = pts[i].y;
-		pts[i].y = t;
+		pixel_to_ground_plane(cam_1_Ct, pts[i].x, pts[i].y, &(pts[i].x),
+				&(pts[i].y));
 	}
 
 	if ((*nb_pts) > (POLY_LENGTH * 2)) {

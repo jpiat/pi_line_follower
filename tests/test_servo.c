@@ -2,5 +2,5 @@
 
 
 int main(int argc, char ** argv){
-	detect_line_test(argc, argv); 
+	detect_line_test(argc, argv);
 }

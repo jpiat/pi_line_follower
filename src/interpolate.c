@@ -312,7 +312,7 @@ float distort(float r, float * poly, int nb_radial) {
 	return k;
 }
 
-int float_mat_product(float * op1, float * op2, float * res, int op1_nbc,
+int mat_product(float * op1, float * op2, float * res, int op1_nbc,
 		int op1_nbr, int op2_nbc, int op2_nbr) {
 	int i, j, k;
 	memset(res, 0, op2_nbc * (op1_nbr) * sizeof(float));
@@ -354,7 +354,7 @@ void pseudo_inverse(float * a, float * a_inv, int nCols, int nRows) {
 	//printMatrix(vw, nCols, nCols);
 	//a_inv = vW*Ut
 	transpose(a_copy, Ut, nCols, nRows);
-	float_mat_product(vw, Ut, a_inv, nCols, nCols, nRows, nCols);
+	mat_product(vw, Ut, a_inv, nCols, nCols, nRows, nCols);
 	free(vw);
 	free(a_copy);
 	free(v);
@@ -386,7 +386,7 @@ void compute_interpolation(float * x, float * y , float * params, int nb_params,
 	printMatrix(rminusrd, nb_samples, 1);*/
 	pseudo_inverse(Rd, Rd_inv, nb_params, nb_samples);
 	//printMatrix(Rd_inv, nb_undistort_params, nb_samples);
-	float_mat_product(Rd_inv, rminusrd, params, nb_samples,
+	mat_product(Rd_inv, rminusrd, params, nb_samples,
 			nb_params, 1, nb_samples);
 	//printMatrix(params, nb_params, 1);
 	float max_error = 0.0;
