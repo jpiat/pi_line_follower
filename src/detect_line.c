@@ -10,6 +10,8 @@
 #include "camera_parameters.h"
 //Needds to be computed from camera calibration results using resampling.c
 
+double cam_ct[12] ;
+
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
 #define IMG_HEIGHT 480
@@ -231,7 +233,7 @@ float detect_line(IplImage * img, curve * l, point * pts, int * nb_pts) {
 	//project all points in robot frame before fiting
 	//
 	for (i = 0; i < (*nb_pts); i++) {
-		pixel_to_ground_plane(cam_1_Ct, pts[i].x, pts[i].y, &(pts[i].x),
+		pixel_to_ground_plane(cam_ct, pts[i].x, pts[i].y, &(pts[i].x),
 				&(pts[i].y));
 	}
 
@@ -266,6 +268,7 @@ int detect_line_test(int argc, char ** argv) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
+	calc_ct_and_H(camera_pose, K, cam_ct, NULL) ; //compute projection matrix from camera coordinates to world coordinates
 	IplImage * line_image = cvLoadImage(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 	init_profile(0);
 	start_profile(0);

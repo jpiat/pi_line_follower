@@ -76,18 +76,17 @@ void calc_ct_and_H(double * world_to_cam, double * K, double *Ct, double * H) {
 	double_mat_product(&K_struct, &world_to_cam_struct, &Ct_struct, 0, 0);
 
 	print_double_matrix(Ct_struct, "Ct");
-	H[0] = Ct[0];
-	H[1] = Ct[1];
-	H[2] = Ct[3];
-	H[3] = Ct[4];
-	H[4] = Ct[5];
-	H[5] = Ct[7];
-	H[6] = Ct[8];
-	H[7] = Ct[9];
-	H[8] = Ct[11];
-	printf("H =");
-	for (i = 0; i < 9; i++)
-		printf("%lf, ", H[i]);
+	if (H != NULL) {
+		H[0] = Ct[0];
+		H[1] = Ct[1];
+		H[2] = Ct[3];
+		H[3] = Ct[4];
+		H[4] = Ct[5];
+		H[5] = Ct[7];
+		H[6] = Ct[8];
+		H[7] = Ct[9];
+		H[8] = Ct[11];
+	}
 }
 void pixel_to_ground_plane(double * Ct, double u, double v, float * x,
 		float * y) {
