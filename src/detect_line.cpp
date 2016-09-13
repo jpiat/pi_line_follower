@@ -79,7 +79,6 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	unsigned char * inliers = (unsigned char *) malloc(nb_pts * sizeof(char));
 	unsigned char * max_inliers = (unsigned char *) malloc(
 			nb_pts * sizeof(char));
-	curve fct;
 	int max_consensus = 0;
 	for (i = 0; i < RANSAC_NB_LOOPS; i++) {
 		int pt_index = 0;
@@ -87,9 +86,8 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 		unsigned int idx = 0;
 		float max_x_temp = 0;
 		float min_x_temp = 3000.; //arbitrary ...
-		memset(used, 0, NB_LINES_SAMPLED * sizeof(char)); //zero used index
+		memset(used, 0, nb_pts * sizeof(char)); //zero used index
 		while (pt_index < RANSAC_LIST) {
-			//Select set of samples, with distance constraint
 			idx = rand_a_b(0, (nb_pts - 1));
 			while (used[idx] != 0)
 				idx = (idx + 1) % NB_LINES_SAMPLED;
@@ -103,7 +101,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 			pt_index++;
 		}
 		//From initial set, compute polynom
-		compute_interpolation(x, y, fct.p, POLY_LENGTH, pt_index);
+		compute_interpolation(x, y, l->p, POLY_LENGTH, pt_index);
 		max_x_temp = 0;
 		idx = 0;
 		for (idx = 0; idx < nb_pts; idx++) {
@@ -113,7 +111,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 			used[idx] = 1;
 
 			//Distance should be computed properly
-			float error = distance_to_curve(&fct, pts[idx].x, pts[idx].y);
+			float error = distance_to_curve(l, pts[idx].x, pts[idx].y);
 			if (error < RANSAC_INLIER_LIMIT) {
 				inliers[nb_consensus] = idx;
 				nb_consensus++;
@@ -127,7 +125,6 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 				l->max_x = max_x_temp;
 				l->min_x = min_x_temp;
 				memcpy(max_inliers, inliers, nb_consensus * sizeof(char));
-				//memcpy(l->p, fct_params, POLY_LENGTH * sizeof(float));
 			}
 		}
 	}
