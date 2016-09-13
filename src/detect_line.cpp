@@ -13,7 +13,6 @@ using namespace std;
 #define STEER_P 0.25
 #define SPEED_DEC 0.5
 
-
 #define tic      double tic_t = clock();
 #define toc      std::cout << (clock() - tic_t)/CLOCKS_PER_SEC \
                            << " seconds" << std::endl;
@@ -26,11 +25,11 @@ double bot_pos_in_world[4];
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
-#define IMG_HEIGHT 480
-#define SAMPLES_FIRST_LINE 8
-#define SAMPLES_LAST_LINE IMG_HEIGHT
 #define NB_LINES_SAMPLED 16
-#define SAMPLES_SPACE ((SAMPLES_LAST_LINE - SAMPLES_FIRST_LINE)/NB_LINES_SAMPLED)
+#define SAMPLE_SPACING_MM 20.0
+
+float posx_samples_world[NB_LINES_SAMPLED];
+unsigned int posv_samples_cam[NB_LINES_SAMPLED];
 
 float rand_a_b(int a, int b) {
 	//return ((rand() % (b - a) + a;
@@ -38,7 +37,7 @@ float rand_a_b(int a, int b) {
 	return (rand_0_1 * (b - a)) + a;
 }
 
-void kernel_horiz(Mat & img, int * kernel_response, int v) {
+void kernel_horiz(Mat & img, int * kernel_response, unsigned int v) {
 	int i;
 	kernel_response[0] = 0;
 	unsigned char * upixel_ptr = (unsigned char *) img.data;
@@ -163,8 +162,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 	int * sampled_lines = (int *) malloc(img.cols * sizeof(int));
 	srand(time(NULL));
 	for (i = 0; i < NB_LINES_SAMPLED; i++) {
-		kernel_horiz(img, sampled_lines,
-				(SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE)));
+		kernel_horiz(img, sampled_lines, posv_samples_cam[i]);
 		int max = 0, min = 0, max_index = 0, min_index = 0, sig = 0;
 		int score, width;
 		for (j = 1; j < (img.cols - 1); j++) {
@@ -192,7 +190,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 		width = max_index - min_index;
 		if (sig == 1 && score > SCORE_THRESHOLD && width < WIDTH_THRESHOLD) {
 			pts[(*nb_pts)].x = ((float) (max_index + min_index)) / 2.;
-			pts[(*nb_pts)].y = (SAMPLES_FIRST_LINE + i * (SAMPLES_SPACE));
+			pts[(*nb_pts)].y = posv_samples_cam[i];
 			(*nb_pts)++;
 		}
 	}
@@ -235,6 +233,12 @@ int detect_line_test(int argc, char ** argv) {
 		exit(-1);
 	}
 	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
+	for (i = 0; i < NB_LINES_SAMPLED; i++) {
+		posx_samples_world[i] = (i + 1) * SAMPLE_SPACING_MM;
+		ground_plane_to_pixel(cam_ct, posx_samples_world[i], 0, &u, &v);
+		posv_samples_cam[i] = v;
+	}
+
 	Mat line_image;
 	line_image = imread(argv[1], IMREAD_GRAYSCALE);
 	Mat map_image(320, 320,
@@ -272,8 +276,7 @@ int detect_line_test(int argc, char ** argv) {
 	cout << "steering is " << steering << endl;
 	//need to find the correct value
 	float angle_from_steering = steering * STEER_P;
-	float speed_from_steering = 1.0 - (angle_from_steering*SPEED_DEC)  ;
-
+	float speed_from_steering = 1.0 - (angle_from_steering * SPEED_DEC);
 
 	/*pixel_to_ground_plane(cam_ct, 320, 479, &x, &y);
 	 cout << x << ", " << y << endl;
