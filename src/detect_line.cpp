@@ -230,6 +230,7 @@ int detect_line_test(int argc, char ** argv) {
 		exit(-1);
 	}
 	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
+	//Sampling world frame and projecting into camera frame
 	for (i = 0; i < NB_LINES_SAMPLED; i++) {
 		posx_samples_world[i] = (i + 1) * SAMPLE_SPACING_MM;
 		ground_plane_to_pixel(cam_ct, posx_samples_world[i], 0, &u, &v);
