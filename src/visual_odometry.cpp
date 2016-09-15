@@ -187,6 +187,7 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, double * Ct,
 				if (score < DESCRIPTOR_MATCH_THRESHOLD) {
 					//project in robot frame
 					float gp0x, gp0y, gp1x, gp1y;
+					//should distort point before projection
 					pixel_to_ground_plane(Ct, f0->pos.x, f0->pos.y, &gp0x,
 							&gp0y);
 					pixel_to_ground_plane(Ct, f1->pos.x, f1->pos.y, &gp1x,
