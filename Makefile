@@ -1,6 +1,8 @@
 LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs
 CFLAGS=-O3 -Wall -DDEBUG -Iinc/ -Iinc/Eigen
 
+VPATH=src:src/fast:tests
+
 PI_CFLAGS=${CFLAGS} -mfpu=vfp
 PI_LDFLAGS=${LDFLAGS} -lpigpio
 
@@ -28,21 +30,20 @@ clean :
 test_detect_line : ${OBJS_DIR}/test_detect_line.o ${OBJS}
 	g++ -o $@ ${OBJS_DIR}/test_detect_line.o ${OBJS} ${LDFLAGS}
 
-${OBJS_DIR}%.o : ${EXAMPLES_DIR}%.c
+
+${OBJS_DIR}%.o : %.c
 	mkdir -p ${OBJS_DIR}
 	gcc ${CFLAGS} -c $< -o $@
+	
+${OBJS_DIR}%.o : %.cpp
+	mkdir -p ${OBJS_DIR}
+	g++ ${CFLAGS} -c $< -o $@
+	
 
-${OBJS_DIR}%.o : ${SRC_DIR}%.c
+${OBJS_DIR}%.o : ${EXAMPLES_DIR}%.c
 	mkdir -p ${OBJS_DIR}
 	gcc ${CFLAGS} -c $< -o $@
 
 ${OBJS_DIR}%.o : ${EXAMPLES_DIR}%.cpp
 	mkdir -p ${OBJS_DIR}
-	echo ${C_SRC_FILES}
 	g++ ${CFLAGS} -c $< -o $@
-	
-${OBJS_DIR}%.o : ${SRC_DIR}%.cpp
-	mkdir -p ${OBJS_DIR}
-	g++ ${CFLAGS} -c $< -o $@
-	
-
