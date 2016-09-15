@@ -205,6 +205,7 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 	free(vote_space_pop);
 }
 
+#define FAST_THRESHOLD 50
 int estimate_ground_speeds(Mat & img, unsigned int start_line, unsigned int last_line,double * Ct,
 		fxy * speed) {
 	unsigned int i, j;
@@ -215,7 +216,7 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, unsigned int last
 
 	current_stack = (descriptor_stack *) malloc(sizeof(descriptor_stack));
 	corners = fast9_detect_nonmax((img.data + (start_line * img.step)),
-			img.cols, (last_line - start_line), img.step, 60, &nb_corners);
+			img.cols, (last_line - start_line), img.step, FAST_THRESHOLD, &nb_corners);
 	init_stack(current_stack, STACK_SIZE);
 	for (i = 0; i < nb_corners; i++) {
 		corners[i].y += start_line;
