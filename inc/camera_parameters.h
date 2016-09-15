@@ -1,3 +1,10 @@
+#define IMAGE_WIDTH 640
+#define IMAGE_HEIGHT 480
+#define FPS 30
+#define HFLIP 0
+#define VFLIP 0
+
+
 //all the following is computed with matlab calibration toolbox ...
 extern double radial_distort[2];
 

@@ -144,8 +144,8 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	/*
 	 printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
 	 */
-	float confidence = ((float) (max_consensus + RANSAC_LIST))
-			/ ((float) NB_LINES_SAMPLED);
+	float confidence = ((float) (max_consensus))
+			/ ((float) nb_pts);
 	//printf("Confidence %f \n", confidence);
 
 	return confidence;
@@ -209,18 +209,6 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 
 }
 
-float steering_from_curve(curve * c, float x_lookahead, float * y_lookahead) {
-	(*y_lookahead) = 0;
-	int i;
-	for (i = 0; i < POLY_LENGTH; i++) {
-		(*y_lookahead) += c->p[i] * pow(x_lookahead, i);
-	}
-	float D_square = pow(x_lookahead, 2) + pow((*y_lookahead), 2);
-	float r = D_square / (2.0 * (*y_lookahead));
-	float curvature = 1.0 / r;
-	return curvature;
-}
-
 void init_line_detector() {
 	int i;
 	float x, y, u, v;
@@ -274,24 +262,6 @@ int detect_line_test(int argc, char ** argv) {
 		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 2, 8,
 				0);
 	}
-
-	float x_lookahead = 150.0;
-	float y_lookahead;
-	float steering = steering_from_curve(&detected, x_lookahead, &y_lookahead);
-	cout << "steering is " << steering << endl;
-	//need to find the correct value
-	float angle_from_steering = steering * STEER_P;
-	float speed_from_steering = 1.0 - (angle_from_steering * SPEED_DEC);
-
-	/*pixel_to_ground_plane(cam_ct, 320, 479, &x, &y);
-	 cout << x << ", " << y << endl;
-	 */
-	ground_plane_to_pixel(cam_ct, (double) x_lookahead, (double) y_lookahead,
-			&u, &v);
-	distort_radial(K, u, v, &u, &v, radial_distort, 2);
-	//this u,v should be distorded  using the distortion function ...
-	circle(line_image, Point((int) u, (int) v), 4, Scalar(255, 0, 0, 0), 4, 8,
-			0);
 	imshow("orig", line_image);
 	imshow("map", map_image);
 	waitKey(0);

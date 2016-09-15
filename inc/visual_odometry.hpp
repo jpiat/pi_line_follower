@@ -21,8 +21,14 @@ using namespace std;
 
 #ifndef VISUAL_ODOMETRY_H
 #define VISUAL_ODOMETRY_H
-int estimate_ground_speeds(Mat & img, unsigned int start_line, double * Ct,
-		float * speeds);
 
-int test_estimate_ground_speeds(int argc , char ** argv);
+typedef struct fxy {
+	float x;
+	float y;
+} fxy;
+
+void init_visual_odometry();
+int estimate_ground_speeds(Mat & img,fxy * speeds);
+
+int test_estimate_ground_speeds(int argc, char ** argv);
 #endif

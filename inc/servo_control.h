@@ -1,13 +1,12 @@
-#ifdef __arm__
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <unistd.h>
 
+#ifdef __arm__
 #include <pigpio.h>
+#endif
 
-#ifndef SERVO_CONTROL_H
-#define SERVO_CONTROL_H
 
 #define ESC 12
 #define SERVO 13
@@ -21,9 +20,11 @@
 #define CENTER_SERVO 1500
 #define MAX_SERVO 2000
 
+#ifndef SERVO_CONTROL_H
+#define SERVO_CONTROL_H
+
 void arm_esc();
 void set_esc_speed(float speed);
 void set_servo_angle(float angle);
 int test_servo(void);
-#endif
 #endif

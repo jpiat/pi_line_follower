@@ -26,5 +26,6 @@ typedef struct point {
 
 
 float detect_line(Mat * img, curve * l, point * pts, int * nb_pts);
+void init_line_detector() ;
 int detect_line_test(int argc, char ** argv) ;
 #endif

@@ -6,10 +6,6 @@
 
 typedef char binary_descriptor[DESCRIPTOR_LENGTH / 8];
 
-typedef struct fxy {
-	float x;
-	float y;
-} fxy;
 typedef unsigned char comp_vect[4];
 
 typedef struct feature {
@@ -206,8 +202,7 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 }
 
 #define FAST_THRESHOLD 50
-int estimate_ground_speeds(Mat & img, unsigned int start_line, unsigned int last_line,double * Ct,
-		fxy * speed) {
+int estimate_ground_speeds(Mat & img, fxy * speed) {
 	unsigned int i, j;
 	int nb_corners;
 	xy* corners;
@@ -215,11 +210,13 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, unsigned int last
 	int flow_vector_size = 0;
 
 	current_stack = (descriptor_stack *) malloc(sizeof(descriptor_stack));
-	corners = fast9_detect_nonmax((img.data + (start_line * img.step)),
-			img.cols, (last_line - start_line), img.step, FAST_THRESHOLD, &nb_corners);
+	corners = fast9_detect_nonmax(
+			(img.data + (first_line_to_sample * img.step)), img.cols,
+			(last_line_to_sample - first_line_to_sample), img.step,
+			FAST_THRESHOLD, &nb_corners);
 	init_stack(current_stack, STACK_SIZE);
 	for (i = 0; i < nb_corners; i++) {
-		corners[i].y += start_line;
+		corners[i].y += first_line_to_sample;
 		feature * current = (feature *) malloc(sizeof(feature));
 		current->pos.x = corners[i].x;
 		current->pos.y = corners[i].y;
@@ -244,9 +241,9 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, unsigned int last
 					//project in robot frame
 					float gp0x, gp0y, gp1x, gp1y;
 					//should distort point before projection
-					pixel_to_ground_plane(Ct, f0->pos.x, f0->pos.y, &gp0x,
+					pixel_to_ground_plane(cam_ct, f0->pos.x, f0->pos.y, &gp0x,
 							&gp0y);
-					pixel_to_ground_plane(Ct, f1->pos.x, f1->pos.y, &gp1x,
+					pixel_to_ground_plane(cam_ct, f1->pos.x, f1->pos.y, &gp1x,
 							&gp1y);
 					flow_vectors[flow_vector_size].x = gp1x - gp0x;
 					flow_vectors[flow_vector_size].y = gp1y - gp0y;
@@ -305,9 +302,9 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 	Mat first_image, second_image;
 	first_image = imread(argv[1], IMREAD_GRAYSCALE);
 	second_image = imread(argv[2], IMREAD_GRAYSCALE);
-	estimate_ground_speeds(first_image, first_line_to_sample, last_line_to_sample,cam_ct, &speed);
+	estimate_ground_speeds(first_image, &speed);
 	tic
-	estimate_ground_speeds(second_image, first_line_to_sample, last_line_to_sample,cam_ct, &speed);
+	estimate_ground_speeds(second_image, &speed);
 	cout << speed.x << ", " << speed.y << endl;
 	toc
 
