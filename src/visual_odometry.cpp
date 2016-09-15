@@ -1,5 +1,9 @@
 #include <visual_odometry.hpp>
 
+#define tic      double tic_t = clock();
+#define toc      std::cout << (clock() - tic_t)/CLOCKS_PER_SEC \
+                           << " seconds" << std::endl;
+
 typedef char binary_descriptor[DESCRIPTOR_LENGTH / 8];
 
 typedef struct fxy {
@@ -25,7 +29,7 @@ descriptor_stack * last_stack = NULL;
 unsigned int nb_descriptors_in_stack = 0;
 comp_vect * briefPattern;
 
-unsigned int first_line_to_sample;
+unsigned int first_line_to_sample, last_line_to_sample;
 
 void init_stack(descriptor_stack * stack, unsigned int stack_size) {
 	stack->stack = (feature **) malloc(stack_size * sizeof(feature*));
@@ -150,8 +154,59 @@ unsigned int get_match_score(binary_descriptor * d0, binary_descriptor * d1) {
 	return dist;
 }
 
-int estimate_ground_speeds(Mat & img, unsigned int start_line, double * Ct,
-		float * speeds) {
+#define HOUGH_X 30
+#define HOUGH_Y 30
+#define SPEED_MAX 10000.0
+#define SPEED_MIN 0.0
+
+//hough vote to get average speed for x and y
+void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
+		float * speed_y) {
+	int i, j;
+	float min_speed = SPEED_MAX, max_speed = 0., speed_step;
+	int max = 0, max_index;
+	float * vote_space = (float *) malloc(HOUGH_X * HOUGH_Y * sizeof(int));
+	float * vote_space_pop = (float *) malloc(nb_flows * sizeof(unsigned int));
+	memset(vote_space, 0, sizeof(int) * HOUGH_X * HOUGH_Y);
+	(*speed_x) = 0.0;
+	(*speed_y) = 0.0;
+	int nb_pop_max = 0;
+	for (i = 0; i < nb_flows; i++) {
+		if (flow[i].x > max_speed)
+			max_speed = flow[i].x;
+		if (flow[i].y > max_speed)
+			max_speed = flow[i].y;
+		if (flow[i].x < min_speed)
+			min_speed = flow[i].x;
+		if (flow[i].y < min_speed)
+			min_speed = flow[i].y;
+	}
+	speed_step = (max_speed - min_speed) / HOUGH_X;
+	for (i = 0; i < nb_flows; i++) {
+		int indx = (flow[i].x - min_speed) / speed_step;
+		int indy = (flow[i].y - min_speed) / speed_step;
+		vote_space[(indy * HOUGH_X) + indx]++;
+		vote_space_pop[i] = (indy * HOUGH_X) + indx;
+		if (vote_space[(indy * HOUGH_X) + indx] > max) {
+			max = vote_space[(indy * HOUGH_X) + indx];
+			max_index = (indy * HOUGH_X) + indx;
+		}
+	}
+	for (i = 0; i < nb_flows; i++) {
+		if (vote_space_pop[i] == max_index) {
+			nb_pop_max++;
+			(*speed_x) += flow[i].x;
+			(*speed_y) += flow[i].y;
+		}
+	}
+	(*speed_x) /= nb_pop_max;
+	(*speed_y) /= nb_pop_max;
+	free(vote_space);
+	free(vote_space_pop);
+}
+
+int estimate_ground_speeds(Mat & img, unsigned int start_line, unsigned int last_line,double * Ct,
+		fxy * speed) {
 	unsigned int i, j;
 	int nb_corners;
 	xy* corners;
@@ -160,7 +215,7 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, double * Ct,
 
 	current_stack = (descriptor_stack *) malloc(sizeof(descriptor_stack));
 	corners = fast9_detect_nonmax((img.data + (start_line * img.step)),
-			img.cols, (img.rows - start_line), img.step, 60, &nb_corners);
+			img.cols, (last_line - start_line), img.step, 60, &nb_corners);
 	init_stack(current_stack, STACK_SIZE);
 	for (i = 0; i < nb_corners; i++) {
 		corners[i].y += start_line;
@@ -192,8 +247,8 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, double * Ct,
 							&gp0y);
 					pixel_to_ground_plane(Ct, f1->pos.x, f1->pos.y, &gp1x,
 							&gp1y);
-					flow_vectors[flow_vector_size].x = gp0x - gp1x;
-					flow_vectors[flow_vector_size].y = gp0y - gp1y;
+					flow_vectors[flow_vector_size].x = gp1x - gp0x;
+					flow_vectors[flow_vector_size].y = gp1y - gp0y;
 					flow_vector_size++;
 					free(f1->desc);
 					free(f1);
@@ -213,9 +268,11 @@ int estimate_ground_speeds(Mat & img, unsigned int start_line, double * Ct,
 		free(last_stack);
 		last_stack = current_stack;
 
-		for (i = 0; i < flow_vector_size; i++) {
-			cout << flow_vectors[i].x << ", " << flow_vectors[i].y << endl;
-		}
+		/*for (i = 0; i < flow_vector_size; i++) {
+		 cout << flow_vectors[i].x << ", " << flow_vectors[i].y << endl;
+		 }*/
+
+		hough_votes(flow_vectors, flow_vector_size, &(speed->x), &(speed->y));
 		return 1;
 	} else {
 		last_stack = current_stack;
@@ -233,6 +290,8 @@ void init_visual_odometry() {
 	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
 	ground_plane_to_pixel(cam_ct, 400., 0., &u, &v);
 	first_line_to_sample = (unsigned int) v;
+	ground_plane_to_pixel(cam_ct, 20., 0., &u, &v);
+	last_line_to_sample = (unsigned int) v;
 }
 
 int test_estimate_ground_speeds(int argc, char ** argv) {
@@ -240,14 +299,16 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
+	fxy speed;
 	init_visual_odometry();
 	Mat first_image, second_image;
 	first_image = imread(argv[1], IMREAD_GRAYSCALE);
 	second_image = imread(argv[2], IMREAD_GRAYSCALE);
-	estimate_ground_speeds(first_image, first_line_to_sample, cam_ct,
-	NULL);
-	estimate_ground_speeds(second_image, first_line_to_sample, cam_ct,
-	NULL);
+	estimate_ground_speeds(first_image, first_line_to_sample, last_line_to_sample,cam_ct, &speed);
+	tic
+	estimate_ground_speeds(second_image, first_line_to_sample, last_line_to_sample,cam_ct, &speed);
+	cout << speed.x << ", " << speed.y << endl;
+	toc
 
 	imshow("first", first_image);
 	imshow("second", second_image);

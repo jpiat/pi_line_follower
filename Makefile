@@ -1,6 +1,8 @@
 LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lpigpio
 CFLAGS=-O3 -Wall -DDEBUG -Iinc/ -Iinc/Eigen -mfpu=vfp
 
+VPATH=src:src/fast:tests
+
 PI_CFLAGS=${CFLAGS} -mfpu=vfp
 PI_LDFLAGS=${LDFLAGS} -lpigpio
 
@@ -36,12 +38,12 @@ test_detect_line : ${OBJS_DIR}/test_detect_line.o ${OBJS}
 
 test_visual_odometry : ${OBJS_DIR}/test_visual_odometry.o ${OBJS}
 	g++ -o $@ ${OBJS_DIR}/test_visual_odometry.o ${OBJS} ${LDFLAGS}
-
-${OBJS_DIR}%.o : ${EXAMPLES_DIR}%.c
+	
+${OBJS_DIR}%.o : %.c
 	mkdir -p ${OBJS_DIR}
 	gcc ${CFLAGS} -c $< -o $@
-
-${OBJS_DIR}%.o : %.c
+	
+${OBJS_DIR}%.o : ${EXAMPLES_DIR}%.c
 	mkdir -p ${OBJS_DIR}
 	gcc ${CFLAGS} -c $< -o $@
 
@@ -52,5 +54,3 @@ ${OBJS_DIR}%.o : ${EXAMPLES_DIR}%.cpp
 ${OBJS_DIR}%.o : %.cpp
 	mkdir -p ${OBJS_DIR}
 	g++ ${CFLAGS} -c $< -o $@
-	
-
