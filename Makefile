@@ -9,11 +9,6 @@ PI_LDFLAGS=${LDFLAGS} -lpigpio
 EXEC_NAME=detect_line 
 
 SRC_DIR=src/
-SRC_DIR+=src/fast	
-
-
-VPATH = ./src:./src/fast
-
 
 EXAMPLES_DIR=tests/
 OBJS_DIR=build/
