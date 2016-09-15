@@ -220,6 +220,18 @@ float steering_from_curve(curve * c, float x_lookahead, float * y_lookahead) {
 	return curvature;
 }
 
+void init_line_detector() {
+	int i;
+	float x, y, u, v;
+	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
+	//Sampling world frame and projecting into camera frame
+	for (i = 0; i < NB_LINES_SAMPLED; i++) {
+		posx_samples_world[i] = (i + 1) * SAMPLE_SPACING_MM;
+		ground_plane_to_pixel(cam_ct, posx_samples_world[i], 0, &u, &v);
+		posv_samples_cam[i] = v;
+	}
+}
+
 int detect_line_test(int argc, char ** argv) {
 	int i, nb_pts;
 	float x, y, u, v;
@@ -229,14 +241,8 @@ int detect_line_test(int argc, char ** argv) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
-	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
-	//Sampling world frame and projecting into camera frame
-	for (i = 0; i < NB_LINES_SAMPLED; i++) {
-		posx_samples_world[i] = (i + 1) * SAMPLE_SPACING_MM;
-		ground_plane_to_pixel(cam_ct, posx_samples_world[i], 0, &u, &v);
-		posv_samples_cam[i] = v;
-	}
 
+	init_line_detector();
 	Mat line_image;
 	line_image = imread(argv[1], IMREAD_GRAYSCALE);
 	Mat map_image(320, 320,
@@ -264,7 +270,7 @@ int detect_line_test(int argc, char ** argv) {
 		ground_plane_to_pixel(cam_ct, (double) x, (double) resp, &u, &v);
 		if (u > line_image.cols || u < 0 || v > line_image.rows || v < 0)
 			break;
-		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 4, 8,
+		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 2, 8,
 				0);
 	}
 
