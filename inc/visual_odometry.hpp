@@ -15,8 +15,8 @@ using namespace cv;
 using namespace std;
 
 #define DESCRIPTOR_WINDOW 32
-#define DESCRIPTOR_LENGTH 256
-#define DESCRIPTOR_MATCH_THRESHOLD 64
+#define DESCRIPTOR_LENGTH 256 //Need to test different length and threshold
+#define DESCRIPTOR_MATCH_THRESHOLD 48
 #define STACK_SIZE 100
 
 #ifndef VISUAL_ODOMETRY_H

@@ -286,7 +286,7 @@ void init_visual_odometry() {
 	float u, v;
 	briefPattern = initBriefPattern(briefPattern, DESCRIPTOR_LENGTH);
 	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
-	ground_plane_to_pixel(cam_ct, 400., 0., &u, &v);
+	ground_plane_to_pixel(cam_ct, 500., 0., &u, &v);
 	first_line_to_sample = (unsigned int) v;
 	ground_plane_to_pixel(cam_ct, 20., 0., &u, &v);
 	last_line_to_sample = (unsigned int) v;

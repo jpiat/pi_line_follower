@@ -14,6 +14,8 @@ extern "C" {
 using namespace std;
 using namespace cv;
 
+#define POLE_INPUT 0
+
 #ifdef PI_CAM
 #include "RaspiCamCV.h"
 
@@ -121,9 +123,23 @@ int main(void) {
 	float y_lookahead;
 	init_line_detector();
 	init_visual_odometry();
+#ifdef DEBUG
+	if(argc > 1) {
+		cout << "Need a path to video in testing" << endl;
+		exit(-1);
+	}
+	initCaptureFromFile(argv[1]);
+#else
 	initCaptureFromCam();
-	//TODO: arm the ESC and set speed to zero
-	//TODO: set steering servo to center
+#endif
+
+#ifdef __arm__
+	gpioSetMode(POLE_INPUT, PI_INPUT);
+	gpioSetPullUpDown(0, PI_PUD_UP);
+#endif
+	init_servo();
+	arm_esc();
+	set_servo_angle(0.0);
 	while (1) {
 		Mat img = getFrame();
 		if (alive) {
@@ -131,7 +147,8 @@ int main(void) {
 				frame_counter--;
 				continue;
 			} else {
-				if (detect_line(&img, &line, pts, &nb_points) < 0.25) {
+
+				if (detect_line(img, &line, pts, &nb_points) < 0.25) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
 					detect_line_timeout--;
 				} else {
@@ -147,12 +164,14 @@ int main(void) {
 				float speed_from_steering = 1.0
 						- (angle_from_steering * SPEED_DEC);
 				//TODO: apply command to servo and esc
-
+				set_esc_speed(speed_from_steering);
+				set_servo_angle(angle_from_steering);
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
 				if (falling_edge || detect_line_timeout <= 0) {
 					alive = 0;
-					//TODO: set ESC to zero
-					//TODO: close IO library
+					set_esc_speed(0.);
+					set_servo_angle(0.);
+					close_servo();
 					sleep(2);
 					exit(0);
 				}
@@ -163,6 +182,14 @@ int main(void) {
 				alive = 1;
 			}
 		}
+#ifdef __arm__
+		rising_edge = (old_state == 0) & (gpioRead(POLE_INPUT) == 1);
+		falling_edge = (old_state == 1) & (gpioRead(POLE_INPUT) == 0);
+		old_state = gpioRead(POLE_INPUT);
+#else
+		rising_edge = 1;
+		falling_edge = 0;
+#endif
 	}
 
 }

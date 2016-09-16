@@ -1,6 +1,10 @@
 #include "servo_control.h"
 
 #ifdef __arm__
+
+int init_servo() {
+	return gpioInitialise();
+}
 void arm_esc() {
 	gpioServo(ESC, ARM_ESC);
 	sleep(2);
@@ -31,7 +35,23 @@ int test_servo(void) {
 	gpioTerminate();
 	return 1;
 }
+
+int close_servo() {
+	gpioTerminate();
+	return 1;
+}
 #else
+
+int init_servo() {
+	printf("Arming servo system \n");
+	return 1;
+}
+
+int close_servo() {
+	printf("Closing servo system \n");
+	return 1;
+}
+
 void arm_esc() {
 	printf("Arming esc \n");
 }
@@ -48,19 +68,13 @@ void set_servo_angle(float angle) {
 
 int test_servo(void) {
 	float i;
-#ifdef __arm__
-	if (gpioInitialise() < 0) {
-		printf("Cannot initialise GPIO \n");
-		exit(-1);
-		// pigpio initialisation failed.
-	}
-#endif
+	init_servo();
 	printf("Arming ESC \n");
 	arm_esc();
 	for (i = -1.0; i < 1.0; i += 0.1) {
 		set_servo_angle(i);
 	}
-	gpioTerminate();
+	close_servo();
 	return 1;
 }
 #endif

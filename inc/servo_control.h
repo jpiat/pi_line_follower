@@ -23,6 +23,8 @@
 #ifndef SERVO_CONTROL_H
 #define SERVO_CONTROL_H
 
+int init_servo();
+int close_servo();
 void arm_esc();
 void set_esc_speed(float speed);
 void set_servo_angle(float angle);
