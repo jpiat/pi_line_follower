@@ -1,6 +1,7 @@
-#include "detect_line.h"
-
+extern "C"{
+#include "servo_control.h"
+}
 
 int main(int argc, char ** argv){
-	detect_line_test(argc, argv);
+	test_servo();
 }

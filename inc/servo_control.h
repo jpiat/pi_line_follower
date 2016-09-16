@@ -16,9 +16,9 @@
 #define MAX_ESC  1600
 #define ARM_ESC 1500
 
-#define MIN_SERVO 1000
+#define MIN_SERVO 1200
 #define CENTER_SERVO 1500
-#define MAX_SERVO 2000
+#define MAX_SERVO 1800
 
 #ifndef SERVO_CONTROL_H
 #define SERVO_CONTROL_H
