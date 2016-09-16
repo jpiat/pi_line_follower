@@ -14,7 +14,7 @@ extern "C" {
 using namespace std;
 using namespace cv;
 
-#define POLE_INPUT 0
+#define POLE_INPUT 17
 
 #ifdef PI_CAM
 #include "RaspiCamCV.h"
