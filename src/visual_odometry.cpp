@@ -154,8 +154,8 @@ unsigned int get_match_score(binary_descriptor * d0, binary_descriptor * d1) {
 #define HOUGH_Y 30
 #define SPEED_X_MAX 5000.0
 #define SPEED_X_MIN 0.0
-#define SPEED_Y_MAX 100.0
-#define SPEED_Y_MIN -100.0
+#define SPEED_Y_MAX 500.0
+#define SPEED_Y_MIN -500.0
 #define SPEED_X_STEP ((SPEED_X_MAX - SPEED_X_MIN)/((float) HOUGH_X))
 #define SPEED_Y_STEP ((SPEED_Y_MAX - SPEED_Y_MIN)/((float) HOUGH_Y))
 
@@ -173,6 +173,7 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 	for (i = 0; i < nb_flows; i++) {
 		int indx = (flow[i].x + SPEED_X_MIN) / SPEED_X_STEP;
 		int indy = (flow[i].y + SPEED_Y_MIN) / SPEED_Y_STEP;
+		if(indx > HOUGH_X || indy > HOUGH_Y || indx < 0 || indy < 0) continue ; //does not fit the model
 		vote_space[(indy * HOUGH_X) + indx]++;
 		vote_space_pop[i] = (indy * HOUGH_X) + indx;
 		if (vote_space[(indy * HOUGH_X) + indx] > max) {
