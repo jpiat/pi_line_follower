@@ -152,14 +152,17 @@ unsigned int get_match_score(binary_descriptor * d0, binary_descriptor * d1) {
 
 #define HOUGH_X 30
 #define HOUGH_Y 30
-#define SPEED_MAX 10000.0
-#define SPEED_MIN 0.0
+#define SPEED_X_MAX 5000.0
+#define SPEED_X_MIN 0.0
+#define SPEED_Y_MAX 100.0
+#define SPEED_Y_MIN -100.0
+#define SPEED_X_STEP ((SPEED_X_MAX - SPEED_X_MIN)/((float) HOUGH_X))
+#define SPEED_Y_STEP ((SPEED_Y_MAX - SPEED_Y_MIN)/((float) HOUGH_Y))
 
 //hough vote to get average speed for x and y
 void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 		float * speed_y) {
 	int i, j;
-	float min_speed = SPEED_MAX, max_speed = 0., speed_step;
 	int max = 0, max_index;
 	float * vote_space = (float *) malloc(HOUGH_X * HOUGH_Y * sizeof(int));
 	float * vote_space_pop = (float *) malloc(nb_flows * sizeof(unsigned int));
@@ -168,19 +171,8 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 	(*speed_y) = 0.0;
 	int nb_pop_max = 0;
 	for (i = 0; i < nb_flows; i++) {
-		if (flow[i].x > max_speed)
-			max_speed = flow[i].x;
-		if (flow[i].y > max_speed)
-			max_speed = flow[i].y;
-		if (flow[i].x < min_speed)
-			min_speed = flow[i].x;
-		if (flow[i].y < min_speed)
-			min_speed = flow[i].y;
-	}
-	speed_step = (max_speed - min_speed) / HOUGH_X;
-	for (i = 0; i < nb_flows; i++) {
-		int indx = (flow[i].x - min_speed) / speed_step;
-		int indy = (flow[i].y - min_speed) / speed_step;
+		int indx = (flow[i].x + SPEED_X_MIN) / SPEED_X_STEP;
+		int indy = (flow[i].y + SPEED_Y_MIN) / SPEED_Y_STEP;
 		vote_space[(indy * HOUGH_X) + indx]++;
 		vote_space_pop[i] = (indy * HOUGH_X) + indx;
 		if (vote_space[(indy * HOUGH_X) + indx] > max) {

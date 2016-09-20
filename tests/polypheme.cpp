@@ -96,8 +96,15 @@ Mat getFrame() {
 
 #endif
 
-float steering_from_curve(curve * c, float x_lookahead, float * y_lookahead) {
+float steering_speed_from_curve(curve * c, float x_lookahead, float * y_lookahead, float * speed) {
 	(*y_lookahead) = 0;
+	(*speed) = 1.0 ;
+	if(x_lookahead > c->max_x || x_lookahead < c->min_x){
+
+		(*speed) = c->max_x/x_lookahead ;
+		x_lookahead = c->max_x ;//may not be the best idea ...
+
+	}
 	int i;
 	for (i = 0; i < POLY_LENGTH; i++) {
 		(*y_lookahead) += c->p[i] * pow(x_lookahead, i);
@@ -158,11 +165,13 @@ int main(void) {
 				if (estimate_ground_speeds(img, &speed)) {
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
 				}
-				float steering = steering_from_curve(&line, 150.0,
-						&y_lookahead); //lookahead point should evolve with speed
+				float speed_factor ;
+				float steering = steering_speed_from_curve(&line, 150.0,
+						&y_lookahead , &speed_factor); //lookahead point should evolve with speed
 				float angle_from_steering = steering * STEER_P;
 				float speed_from_steering = 1.0
 						- (angle_from_steering * SPEED_DEC);
+				speed_from_steering *= speed_factor ;
 				//TODO: apply command to servo and esc
 				set_esc_speed(speed_from_steering);
 				set_servo_angle(angle_from_steering);
@@ -177,7 +186,6 @@ int main(void) {
 				}
 			}
 		} else {
-			//TODO:detect rising edge on IO
 			if (rising_edge) {
 				alive = 1;
 			}
