@@ -101,7 +101,6 @@ float steering_speed_from_curve(curve * c, float x_lookahead, float * y_lookahea
 	(*y_lookahead) = 0;
 	(*speed) = 1.0 ;
 	if(x_lookahead > c->max_x || x_lookahead < c->min_x){
-
 		(*speed) = c->max_x/x_lookahead ;
 		x_lookahead = c->max_x ;//may not be the best idea ...
 
@@ -119,6 +118,7 @@ float steering_speed_from_curve(curve * c, float x_lookahead, float * y_lookahea
 #define STEER_P 0.25
 #define SPEED_DEC 0.5
 int main(void) {
+	int update = 0 ;
 	int alive = 0;
 	int frame_counter = -1;
 	int old_state = 1;
@@ -142,16 +142,16 @@ int main(void) {
 	initCaptureFromCam();
 #endif
 
+	init_servo();
 #ifdef __arm__
 	gpioSetMode(POLE_INPUT, PI_INPUT);
-	gpioSetPullUpDown(0, PI_PUD_UP);
+	gpioSetPullUpDown(POLE_INPUT, PI_PUD_UP);
 #endif
-	init_servo();
 	arm_esc();
 	set_servo_angle(0.0);
 	while (1) {
 		Mat img = getFrame();
-		if (alive) {
+		if (alive == 1) {
 			if (frame_counter > 0) {
 				frame_counter--;
 				continue;
@@ -160,26 +160,35 @@ int main(void) {
 				if (detect_line(img, &line, pts, &nb_points) < 0.25) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
 					detect_line_timeout--;
+					update = 0 ;
 				} else {
 					detect_line_timeout = 10;
+					update = 1 ;
 				}
-
+				cout << "line detector used " << nb_points << endl ;
 				if (estimate_ground_speeds(img, &speed)) {
+					cout << "speed " <<speed.x << ", "<<speed.y <<endl ;
 					travelled_distance += sqrt(pow(speed.x, 2) +  pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
 				}
-				float speed_factor ;
-				float steering = steering_speed_from_curve(&line, 150.0,
+				if(update == 1){
+					float speed_factor ;
+					float steering = steering_speed_from_curve(&line, 150.0,
 						&y_lookahead , &speed_factor); //lookahead point should evolve with speed
-				float angle_from_steering = steering * STEER_P;
-				float speed_from_steering = 1.0
-						- (angle_from_steering * SPEED_DEC);
-				speed_from_steering *= speed_factor ;
-				//TODO: apply command to servo and esc
-				set_esc_speed(speed_from_steering);
-				set_servo_angle(angle_from_steering);
+					float angle_from_steering = steering * STEER_P;
+					float speed_from_steering = 1.0
+						- (abs(angle_from_steering) * SPEED_DEC);
+					speed_from_steering *= speed_factor ;
+					//TODO: apply command to servo and esc
+				 	//cout << "speed factor:" << speed_factor << endl ;
+					//cout << "speed :" << speed_from_steering << endl ;
+					//cout << "steering :" << angle_from_steering << endl ;
+					set_esc_speed(speed_from_steering);
+					set_servo_angle(angle_from_steering);
+				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
 				if (travelled_distance >= DISTANCE_TO_TRAVEL || detect_line_timeout <= 0) {
+					cout << "distance travelled "<< endl ;
 					alive = 0;
 					set_esc_speed(0.);
 					set_servo_angle(0.);
@@ -191,11 +200,13 @@ int main(void) {
 		} else {
 			if (rising_edge) {
 				alive = 1;
+				cout << "countdown to start " << endl ;
 				frame_counter = 60 ; //initialize a 2sec timeout before robot starts
 				travelled_distance = 0. ;
 			}
 		}
 #ifdef __arm__
+		//cout << gpioRead(POLE_INPUT) << endl ;
 		rising_edge = (old_state == 0) & (gpioRead(POLE_INPUT) == 1);
 		falling_edge = (old_state == 1) & (gpioRead(POLE_INPUT) == 0);
 		old_state = gpioRead(POLE_INPUT);
