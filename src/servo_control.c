@@ -5,6 +5,8 @@
 int init_servo() {
 	return gpioInitialise();
 }
+
+
 void arm_esc() {
 	gpioServo(ESC, ARM_ESC);
 	sleep(2);
@@ -18,22 +20,6 @@ void set_esc_speed(float speed) {
 void set_servo_angle(float angle) {
 	float cmd = CENTER_SERVO + ((MAX_SERVO - CENTER_SERVO) * angle);
 	gpioServo(ESC, (unsigned int) cmd);
-}
-
-int test_servo(void) {
-	float i;
-	if (gpioInitialise() < 0) {
-		printf("Cannot initialise GPIO \n");
-		exit(-1);
-		// pigpio initialisation failed.
-	}
-	printf("Arming ESC \n");
-	arm_esc();
-	for (i = -1.0; i < 1.0; i += 0.1) {
-		set_servo_angle(i);
-	}
-	gpioTerminate();
-	return 1;
 }
 
 int close_servo() {
@@ -65,16 +51,20 @@ void set_servo_angle(float angle) {
 	float cmd = CENTER_SERVO + ((MAX_SERVO - CENTER_SERVO) * angle);
 	printf("Setting servo to %f \n", cmd);
 }
+#endif
 
 int test_servo(void) {
-	float i;
+	int i;
 	init_servo();
 	printf("Arming ESC \n");
 	arm_esc();
-	for (i = -1.0; i < 1.0; i += 0.1) {
-		set_servo_angle(i);
+	printf("ESC armed and ready to go \n");
+	for(i = 0 ; i < 1024; i ++) {
+		float angle = -1.0 + i*(2./1024.0);
+		printf("%f \n", angle);
+		set_servo_angle(angle);
+		usleep(100000);
 	}
 	close_servo();
 	return 1;
 }
-#endif
