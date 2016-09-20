@@ -13,11 +13,15 @@ void arm_esc() {
 }
 
 void set_esc_speed(float speed) {
+	if(speed > 1.0) speed = 1.0 ;
+	if(speed < -1.0) speed = -1.0;
 	float cmd = CENTER_ESC + ((MAX_ESC - CENTER_ESC) * speed);
 	gpioServo(ESC, (unsigned int) cmd);
 }
 
 void set_servo_angle(float angle) {
+	if(angle > 1.0) angle = 1.0;
+	if(angle < -1.0) angle = -1.0;
 	float cmd = CENTER_SERVO + ((MAX_SERVO - CENTER_SERVO) * angle);
 	gpioServo(ESC, (unsigned int) cmd);
 }

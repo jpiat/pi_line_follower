@@ -171,8 +171,11 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 	(*speed_y) = 0.0;
 	int nb_pop_max = 0;
 	for (i = 0; i < nb_flows; i++) {
-		int indx = (flow[i].x + SPEED_X_MIN) / SPEED_X_STEP;
-		int indy = (flow[i].y + SPEED_Y_MIN) / SPEED_Y_STEP;
+//		cout << "speed x is " << flow[i].x << endl;
+//		 cout << "speed y is " << flow[i].y << endl;
+		int indx = (flow[i].x - SPEED_X_MIN) / SPEED_X_STEP;
+		int indy = (flow[i].y - SPEED_Y_MIN) / SPEED_Y_STEP;
+//		cout << "vote index : "<<indx << ", " << indy << endl ;
 		if(indx > HOUGH_X || indy > HOUGH_Y || indx < 0 || indy < 0) continue ; //does not fit the model
 		vote_space[(indy * HOUGH_X) + indx]++;
 		vote_space_pop[i] = (indy * HOUGH_X) + indx;
@@ -188,6 +191,7 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 			(*speed_y) += flow[i].y;
 		}
 	}
+//	cout << " max pop is " << nb_pop_max << endl ;
 	(*speed_x) /= nb_pop_max;
 	(*speed_y) /= nb_pop_max;
 	free(vote_space);
@@ -208,6 +212,7 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 			(last_line_to_sample - first_line_to_sample), img.step,
 			FAST_THRESHOLD, &nb_corners);
 	init_stack(current_stack, STACK_SIZE);
+//	cout << "found " << nb_corners << " corners" << endl ;
 	for (i = 0; i < nb_corners; i++) {
 		corners[i].y += first_line_to_sample;
 		feature * current = (feature *) malloc(sizeof(feature));
@@ -262,10 +267,17 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		/*for (i = 0; i < flow_vector_size; i++) {
 		 cout << flow_vectors[i].x << ", " << flow_vectors[i].y << endl;
 		 }*/
-
-		hough_votes(flow_vectors, flow_vector_size, &(speed->x), &(speed->y));
-		return 1;
+//		cout << "found "<< flow_vector_size << " vectors " << endl ;
+		if(flow_vector_size > 10){
+			hough_votes(flow_vectors, flow_vector_size, &(speed->x), &(speed->y));
+			free(flow_vectors);
+			return 1 ;
+		}else{
+			free(flow_vectors);
+			return 0 ;
+		}
 	} else {
+		free(flow_vectors);
 		last_stack = current_stack;
 		return 0; //exchange for the next frame
 	}
@@ -290,6 +302,7 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
+	int success ;
 	fxy speed;
 	init_visual_odometry();
 	Mat first_image, second_image;
@@ -297,10 +310,14 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 	second_image = imread(argv[2], IMREAD_GRAYSCALE);
 	estimate_ground_speeds(first_image, &speed);
 	tic
-	estimate_ground_speeds(second_image, &speed);
-	cout << speed.x << ", " << speed.y << endl;
+	success = estimate_ground_speeds(second_image, &speed);
 	toc
-
+	if(success){
+		cout << speed.x << ", " << speed.y << endl;
+	}else{
+		cout << "Cannot estimate speed" << endl ;
+	}
+	
 	imshow("first", first_image);
 	imshow("second", second_image);
 	waitKey(0);

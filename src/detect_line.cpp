@@ -140,7 +140,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	free(used);
 	free(inliers);
 	free(max_inliers);
-	printf("Max consensus %d \n", max_consensus);
+	//printf("Max consensus %d \n", max_consensus);
 	/*
 	 printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
 	 */
