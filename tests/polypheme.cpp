@@ -1,6 +1,7 @@
 #include "camera_parameters.h"
 #include <iostream>
 #include <unistd.h>
+#include <math.h>
 #include "opencv2/videoio/videoio.hpp"
 #include "opencv2/core/core.hpp"
 
@@ -15,7 +16,7 @@ using namespace std;
 using namespace cv;
 
 #define POLE_INPUT 17
-
+#define DISTANCE_TO_TRAVEL 130000.0
 #ifdef PI_CAM
 #include "RaspiCamCV.h"
 
@@ -124,6 +125,7 @@ int main(void) {
 	int rising_edge = 0, falling_edge = 0;
 	int detect_line_timeout = 10;
 	int nb_points;
+	double travelled_distance = 0. ;
 	point pts[16];
 	curve line;
 	fxy speed;
@@ -163,6 +165,7 @@ int main(void) {
 				}
 
 				if (estimate_ground_speeds(img, &speed)) {
+					travelled_distance += sqrt(pow(speed.x, 2) +  pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
 				}
 				float speed_factor ;
@@ -176,7 +179,7 @@ int main(void) {
 				set_esc_speed(speed_from_steering);
 				set_servo_angle(angle_from_steering);
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
-				if (falling_edge || detect_line_timeout <= 0) {
+				if (travelled_distance >= DISTANCE_TO_TRAVEL || detect_line_timeout <= 0) {
 					alive = 0;
 					set_esc_speed(0.);
 					set_servo_angle(0.);
@@ -188,6 +191,8 @@ int main(void) {
 		} else {
 			if (rising_edge) {
 				alive = 1;
+				frame_counter = 60 ; //initialize a 2sec timeout before robot starts
+				travelled_distance = 0. ;
 			}
 		}
 #ifdef __arm__
