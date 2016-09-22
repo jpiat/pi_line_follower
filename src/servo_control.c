@@ -8,7 +8,9 @@ int init_servo() {
 
 
 void arm_esc() {
-	gpioServo(ESC, ARM_ESC);
+	gpioServo(ESC, ARM_ESC_1);
+	sleep(1);
+	gpioServo(ESC, ARM_ESC_2);
 	sleep(2);
 }
 
@@ -23,7 +25,7 @@ void set_servo_angle(float angle) {
 	if(angle > 1.0) angle = 1.0;
 	if(angle < -1.0) angle = -1.0;
 	float cmd = CENTER_SERVO + ((MAX_SERVO - CENTER_SERVO) * angle);
-	gpioServo(ESC, (unsigned int) cmd);
+	gpioServo(SERVO, (unsigned int) cmd);
 }
 
 int close_servo() {
@@ -65,9 +67,9 @@ int test_servo(void) {
 	printf("ESC armed and ready to go \n");
 	for(i = 0 ; i < 1024; i ++) {
 		float angle = -1.0 + i*(2./1024.0);
-		printf("%f \n", angle);
+		//printf("%f \n", angle);
 		set_servo_angle(angle);
-		usleep(100000);
+		usleep(10000);
 	}
 	close_servo();
 	return 1;
