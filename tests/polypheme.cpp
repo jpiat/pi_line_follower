@@ -59,10 +59,10 @@ Mat getFrame() {
 		capture_from_file >> img;
 		return img;
 	} else {
-		int success, i;
+		int success;
 		do {
 			success = raspiCamCvGrab(capture);
-			if(success == 0) usleep(50000);
+			if(success == 0) usleep(500);
 		}while(success == 0);
 		IplImage* image = raspiCamCvRetrieve(capture);
 		Mat img = cvarrToMat(image);
