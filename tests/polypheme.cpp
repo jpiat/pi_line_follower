@@ -32,7 +32,7 @@ int initCaptureFromCam() {
 	config->height=IMAGE_HEIGHT;
 	config->bitrate=0;      // zero: leave as default
 	config->framerate=FPS;
-	config->monochrome=0;
+	config->monochrome=1;
 	properties->hflip = HFLIP;
 	properties->vflip = VFLIP;
 	properties -> sharpness = 0;
@@ -98,7 +98,7 @@ Mat getFrame() {
 
 #endif
 
-#define STEER_P 0.25
+#define STEER_P 0.10
 #define SPEED_DEC 0.5
 int main(void) {
 	int update = 0 ;
@@ -139,8 +139,9 @@ int main(void) {
 				frame_counter--;
 				continue;
 			} else {
-
-				if (detect_line(img, &line, pts, &nb_points) < 0.25) {
+				float confidence = detect_line(img, &line, pts, &nb_points);
+				cout << "Confidence " << confidence << endl ;
+				if (confidence < 0.25) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
 					detect_line_timeout--;
 					update = 0 ;

@@ -1,5 +1,5 @@
-LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lpigpio
-CFLAGS=-O3 -Wall -DDEBUG -Iinc/ -Iinc/Eigen -mfpu=vfp
+LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_videoio -lpigpio -lwiringPi -lraspicamcv
+CFLAGS=-O3 -Wall -Iinc/ -Iinc/Eigen -DPI_CAM -mfpu=vfp
 
 VPATH=src:src/fast:tests
 
@@ -28,6 +28,9 @@ all : test_detect_line test_visual_odometry test_servo
 clean :
 	rm -Rf ${OBJS_DIR} test_detect_line
 	
+polypheme : ${OBJS_DIR}/polypheme.o ${OBJS}
+	g++ -o $@ ${OBJS_DIR}/polypheme.o ${OBJS} ${LDFLAGS}
+
 test_detect_line : ${OBJS_DIR}/test_detect_line.o ${OBJS}
 	g++ -o $@ ${OBJS_DIR}/test_detect_line.o ${OBJS} ${LDFLAGS}
 
