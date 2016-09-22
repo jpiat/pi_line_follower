@@ -153,7 +153,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	return confidence;
 }
 
-#define SCORE_THRESHOLD 500
+#define SCORE_THRESHOLD 300
 #define WIDTH_THRESHOLD 100
 float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 	int i, j;
@@ -187,7 +187,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 		}
 		score = abs(min) + abs(max);
 		width = max_index - min_index;
-		if (sig == 1 && score > SCORE_THRESHOLD && width < WIDTH_THRESHOLD) {
+		if (sig == 1 && score > SCORE_THRESHOLD /*&& width < WIDTH_THRESHOLD*/) {
 			pts[(*nb_pts)].x = ((float) (max_index + min_index)) / 2.;
 			pts[(*nb_pts)].y = posv_samples_cam[i];
 			(*nb_pts)++;
@@ -267,6 +267,7 @@ int detect_line_test(int argc, char ** argv) {
 	curvature = steering_speed_from_curve(&detected, 150.0,
 							&y_lookahead , &speed_factor);
 	cout << "Curvature " << curvature << endl ;
+	cout << "Speed factor " << speed_factor << endl ;
 	cout << "Y lookahead " << y_lookahead << endl ;
 	imshow("orig", line_image);
 	imshow("map", map_image);
