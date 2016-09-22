@@ -18,6 +18,6 @@ float steering_speed_from_curve(curve * c, float x_lookahead, float * y_lookahea
 	}
 	float D_square = pow(x_lookahead, 2) + pow((*y_lookahead), 2);
 	float r = D_square / (2.0 * (*y_lookahead));
-	float curvature = 1.0 / r;
+	float curvature = 1000.0 / r; //to have in milimeters instead of meters
 	return curvature;
 }
