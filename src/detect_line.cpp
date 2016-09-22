@@ -6,6 +6,8 @@
 #include "interpolate.hpp"
 #include "resampling.hpp"
 #include "detect_line.hpp"
+#include "navigation.hpp"
+
 
 #include "camera_parameters.h"
 using namespace std;
@@ -223,7 +225,7 @@ void init_line_detector() {
 
 int detect_line_test(int argc, char ** argv) {
 	int i, nb_pts;
-	float x, y, u, v;
+	float x, y, u, v, y_lookahead, speed_factor, curvature;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
 	if (argc < 2) {
@@ -262,6 +264,10 @@ int detect_line_test(int argc, char ** argv) {
 		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 2, 8,
 				0);
 	}
+	curvature = steering_speed_from_curve(&detected, 150.0,
+							&y_lookahead , &speed_factor);
+	cout << "Curvature " << curvature << endl ;
+	cout << "Y lookahead " << y_lookahead << endl ;
 	imshow("orig", line_image);
 	imshow("map", map_image);
 	waitKey(0);
