@@ -59,14 +59,17 @@ Mat getFrame() {
 		capture_from_file >> img;
 		return img;
 	} else {
-		int success;
+		int success, i;
 		do {
 			success = raspiCamCvGrab(capture);
 			if(success == 0) usleep(50000);
 		}while(success == 0);
 		IplImage* image = raspiCamCvRetrieve(capture);
-		Mat img(image->height, image->width, CV_8UC3, Scalar(0));
-		memcpy(img.data, image->imageData, image->width*image->height*image->nChannels);
+		Mat img = cvarrToMat(image);
+		/*Mat img(image->height, image->width, CV_8UC1, Scalar(0));
+		for(i = 0 ; i < image->height ; i ++){
+			memcpy(&(img.data[i*img.step]), &(image->imageData[i*image->widthStep]), image->width*image->nChannels);
+		}*/
 		return img;
 	}
 }
@@ -132,6 +135,7 @@ int main(void) {
 #endif
 	arm_esc();
 	set_servo_angle(0.0);
+	alive = 1 ; //to be removed when not debugging
 	while (1) {
 		Mat img = getFrame();
 		if (alive == 1) {
@@ -155,6 +159,8 @@ int main(void) {
 					travelled_distance += sqrt(pow(speed.x, 2) +  pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
 				}
+				//imshow("img", img);
+				//waitKey(0);
 				if(update == 1){
 					float speed_factor ;
 					float steering = steering_speed_from_curve(&line, 150.0,
