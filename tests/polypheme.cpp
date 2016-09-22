@@ -26,6 +26,7 @@ VideoCapture capture_from_file;
 int input_is_file = 0;
 
 int initCaptureFromCam() {
+<<<<<<< HEAD
 RASPIVID_CONFIG * config = (RASPIVID_CONFIG*)malloc(sizeof(RASPIVID_CONFIG));
 RASPIVID_PROPERTIES * properties = (RASPIVID_PROPERTIES*)malloc(sizeof(RASPIVID_PROPERTIES));
 config->width=IMAGE_WIDTH;
@@ -43,6 +44,25 @@ properties -> exposure = AUTO;
 properties -> shutter_speed = 0;// 0 is autoo
 capture = (RaspiCamCvCapture *) raspiCamCvCreateCameraCapture3(0, config, properties, 1);
 return 1;
+=======
+	RASPIVID_CONFIG * config = (RASPIVID_CONFIG*)malloc(sizeof(RASPIVID_CONFIG));
+	RASPIVID_PROPERTIES * properties = (RASPIVID_PROPERTIES*)malloc(sizeof(RASPIVID_PROPERTIES));
+	config->width=IMAGE_WIDTH;
+	config->height=IMAGE_HEIGHT;
+	config->bitrate=0;      // zero: leave as default
+	config->framerate=FPS;
+	config->monochrome=1;
+	properties->hflip = HFLIP;
+	properties->vflip = VFLIP;
+	properties -> sharpness = 0;
+	properties -> contrast = 0;
+	properties -> brightness = 50;
+	properties -> saturation = 0;
+	properties -> exposure = AUTO;
+	properties -> shutter_speed = 0;// 0 is autoo
+	capture = (RaspiCamCvCapture *) raspiCamCvCreateCameraCapture3(0, config, properties, 1);
+	return 1;
+>>>>>>> 00f1298c7c1dc158e2a9e5c0a759553ee2c538d7
 }
 int initCaptureFromFile(char * path) {
 if (!capture_from_file.open(path)) {
@@ -54,6 +74,7 @@ return 1;
 }
 
 Mat getFrame() {
+<<<<<<< HEAD
 if(input_is_file) {
 	Mat img;
 	capture_from_file >> img;
@@ -69,6 +90,26 @@ if(input_is_file) {
 	memcpy(img.data, image->imageData, image->width*image->height*image->nChannels);
 	return img;
 }
+=======
+	if(input_is_file) {
+		Mat img;
+		capture_from_file >> img;
+		return img;
+	} else {
+		int success, i;
+		do {
+			success = raspiCamCvGrab(capture);
+			if(success == 0) usleep(50000);
+		}while(success == 0);
+		IplImage* image = raspiCamCvRetrieve(capture);
+		Mat img = cvarrToMat(image);
+		/*Mat img(image->height, image->width, CV_8UC1, Scalar(0));
+		for(i = 0 ; i < image->height ; i ++){
+			memcpy(&(img.data[i*img.step]), &(image->imageData[i*image->widthStep]), image->width*image->nChannels);
+		}*/
+		return img;
+	}
+>>>>>>> 00f1298c7c1dc158e2a9e5c0a759553ee2c538d7
 }
 
 #else
@@ -98,7 +139,7 @@ return img;
 
 #endif
 
-#define STEER_P 0.25
+#define STEER_P 0.10
 #define SPEED_DEC 0.5
 int main(void) {
 int update = 0;
@@ -133,6 +174,7 @@ init_servo();
 gpioSetMode(POLE_INPUT, PI_INPUT);
 gpioSetPullUpDown(POLE_INPUT, PI_PUD_UP);
 #endif
+<<<<<<< HEAD
 arm_esc();
 set_servo_angle(0.0);
 while (1) {
@@ -172,6 +214,42 @@ while (1) {
 						&y_lookahead, &speed_factor); //lookahead point should evolve with speed
 				float angle_from_steering = steering * STEER_P;
 				float speed_from_steering = 1.0
+=======
+	arm_esc();
+	set_servo_angle(0.0);
+	alive = 1 ; //to be removed when not debugging
+	while (1) {
+		Mat img = getFrame();
+		if (alive == 1) {
+			if (frame_counter > 0) {
+				frame_counter--;
+				continue;
+			} else {
+				float confidence = detect_line(img, &line, pts, &nb_points);
+				cout << "Confidence " << confidence << endl ;
+				if (confidence < 0.25) {
+					//should we consider updating the command when we have a low confidence in the curve estimate
+					detect_line_timeout--;
+					update = 0 ;
+				} else {
+					detect_line_timeout = 10;
+					update = 1 ;
+				}
+				cout << "line detector used " << nb_points << endl ;
+				if (estimate_ground_speeds(img, &speed)) {
+					cout << "speed " <<speed.x << ", "<<speed.y <<endl ;
+					travelled_distance += sqrt(pow(speed.x, 2) +  pow(speed.y, 2));
+					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
+				}
+				//imshow("img", img);
+				//waitKey(0);
+				if(update == 1){
+					float speed_factor ;
+					float steering = steering_speed_from_curve(&line, 150.0,
+						&y_lookahead , &speed_factor); //lookahead point should evolve with speed
+					float angle_from_steering = steering * STEER_P;
+					float speed_from_steering = 1.0
+>>>>>>> 00f1298c7c1dc158e2a9e5c0a759553ee2c538d7
 						- (abs(angle_from_steering) * SPEED_DEC);
 				speed_from_steering *= speed_factor;
 				//TODO: apply command to servo and esc

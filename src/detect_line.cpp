@@ -153,6 +153,7 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	return confidence;
 }
 
+
 #define SCORE_THRESHOLD 300
 #define WIDTH_THRESHOLD 100
 float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
