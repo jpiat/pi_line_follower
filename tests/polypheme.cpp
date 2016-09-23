@@ -5,6 +5,7 @@
 #include "opencv2/videoio/videoio.hpp"
 #include "opencv2/core/core.hpp"
 
+
 #include "detect_line.hpp"
 #include "visual_odometry.hpp"
 #include "navigation.hpp"
@@ -154,18 +155,33 @@ int main(void) {
 				continue;
 			} else {
 				float confidence = detect_line(img, &line, pts, &nb_points);
-				//cout << "Confidence " << confidence << endl;
-				if (confidence < 0.35) {
+#ifdef DEBUG
+				cout << "Confidence " << confidence << endl;
+#endif
+				if (confidence < 0.25) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
 					detect_line_timeout--;
 					update = 0;
 				} else {
 					detect_line_timeout = 10;
 					update = 1;
+					int i ;
+					float u, v ;
+#ifdef DEBUG
+					memset(map_image.data, 255, map_image.step*map_image.rows);
+					for (i = 0; i < nb_points; i++) {
+					ground_plane_to_pixel(cam_ct, (double) pts[i].x, (double) pts[i].y, &u,&v);
+					circle(map_image, Point(pts[i].x, (pts[i].y + map_image.cols / 2)), 1,Scalar(0, 0, 0, 0), 4, 8, 0);
+					}
+					imshow("map", map_image);
+					waitKey(1);
+#endif
 				}
 				//cout << "line detector used " << nb_points << endl;
 				if (estimate_ground_speeds(img, &speed)) {
-					//cout << "speed " << speed.x << ", " << speed.y << endl;
+#ifdef DEBUG
+					cout << "speed " << speed.x << ", " << speed.y << endl;
+#endif
 					travelled_distance += sqrt(
 							pow(speed.x, 2) + pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
@@ -180,10 +196,13 @@ int main(void) {
 					float speed_from_steering = 1.0
 							- (abs(angle_from_steering) * SPEED_DEC);
 					speed_from_steering *= speed_factor;
+
 					//TODO: apply command to servo and esc
+#ifdef DEBUG
 					/*cout << "speed factor:" << speed_factor << endl ;
 					cout << "speed :" << speed_from_steering << endl ;
 					cout << "steering :" << angle_from_steering << endl ;*/
+#endif
 					//set_esc_speed(speed_from_steering);
 					set_servo_angle(angle_from_steering);
 				}
