@@ -16,6 +16,10 @@ extern "C" {
 using namespace std;
 using namespace cv;
 
+#define tic      double tic_t = clock()
+#define toc      ((clock() - tic_t)/CLOCKS_PER_SEC)
+
+
 #define POLE_INPUT 17
 #define DISTANCE_TO_TRAVEL 130000.0
 #ifdef PI_CAM
@@ -59,7 +63,7 @@ Mat getFrame() {
 		capture_from_file >> img;
 		return img;
 	} else {
-		int success;
+		int success = 0 ;
 		do {
 			success = raspiCamCvGrab(capture);
 			if(success == 0) usleep(500);
@@ -103,6 +107,8 @@ Mat getFrame() {
 #define STEER_P -0.20
 #define SPEED_DEC 0.5
 int main(void) {
+	double time_frame  = 0 ;
+	unsigned int fps = 0 ;
 	int update = 0;
 	int alive = 0;
 	int frame_counter = -1;
@@ -141,6 +147,7 @@ int main(void) {
 	while (1) {
 		Mat img = getFrame();
 		if (alive == 1) {
+			tic ;
 			if (frame_counter > 0) {
 				frame_counter--;
 				continue;
@@ -182,7 +189,11 @@ int main(void) {
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
 				if (travelled_distance >= DISTANCE_TO_TRAVEL
 						|| detect_line_timeout <= 0) {
-					cout << "distance travelled " << endl;
+					if(detect_line_timeout <= 0){
+						cout << "Line lost " << endl;
+					}else{
+						cout << "distance travelled " << endl;
+					}
 					alive = 0;
 					//set_esc_speed(0.);
 					set_servo_angle(0.);
@@ -191,11 +202,18 @@ int main(void) {
 					exit(0);
 				}
 			}
+			time_frame = time_frame + toc ;
+			fps ++ ;
+			if(time_frame > 1.0){
+				time_frame = 0 ;
+				cout << fps << endl ;
+				fps = 0 ;
+			}
 		} else {
 			if (rising_edge) {
 				alive = 1;
 				cout << "countdown to start " << endl;
-				frame_counter = 60; //initialize a 2sec timeout before robot starts
+				frame_counter = 2*FPS; //initialize a 2sec timeout before robot starts
 				travelled_distance = 0.;
 			}
 		}
