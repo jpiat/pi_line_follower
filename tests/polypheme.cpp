@@ -108,6 +108,7 @@ Mat getFrame() {
 
 #define STEER_P -0.20
 #define SPEED_DEC 0.5
+#define ACC_FACTOR 0.1
 int main(void) {
 	double time_frame  = 0 ;
 	unsigned int fps = 0 ;
@@ -119,6 +120,7 @@ int main(void) {
 	int rising_edge = 0, falling_edge = 0;
 	int detect_line_timeout = 10;
 	int nb_points;
+	float current_speed = 0. ;
 	double travelled_distance = 0.;
 	Mat map_image(320, 320,
 	CV_8UC1, Scalar(255));
@@ -196,6 +198,11 @@ int main(void) {
 					float speed_from_steering = 1.0
 							- (abs(angle_from_steering) * SPEED_DEC);
 					speed_from_steering *= speed_factor;
+					if(speed_from_steering > current_speed){
+						current_speed += (ACC_FACTOR * (speed_from_steering - current_speed));//limiting acceleration
+					}else{
+						current_speed = speed_from_steering ;
+					}
 
 					//TODO: apply command to servo and esc
 #ifdef DEBUG
@@ -203,7 +210,7 @@ int main(void) {
 					cout << "speed :" << speed_from_steering << endl ;
 					cout << "steering :" << angle_from_steering << endl ;*/
 #endif
-					//set_esc_speed(speed_from_steering);
+					//set_esc_speed(current_speed);
 					set_servo_angle(angle_from_steering);
 				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
