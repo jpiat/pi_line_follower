@@ -16,7 +16,8 @@ void arm_esc() {
 
 void set_esc_speed(float speed) {
 	if(speed > 1.0) speed = 1.0 ;
-	if(speed < -1.0) speed = -1.0;
+	if(speed < 0.) speed = 0. ; //Don't allo w backward for now
+	//if(speed < -1.0) speed = -1.0;
 	float cmd = CENTER_ESC + ((MAX_ESC - CENTER_ESC) * speed);
 	gpioServo(ESC, (unsigned int) cmd);
 }
