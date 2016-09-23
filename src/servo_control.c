@@ -6,6 +6,7 @@ int init_servo() {
 	return gpioInitialise();
 }
 
+
 void arm_esc() {
 	gpioServo(ESC, ARM_ESC_1);
 	sleep(1);

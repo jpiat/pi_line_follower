@@ -20,6 +20,7 @@ using namespace cv;
 #define toc      ((clock() - tic_t)/CLOCKS_PER_SEC)
 
 
+
 #define POLE_INPUT 17
 #define DISTANCE_TO_TRAVEL 130000.0
 #ifdef PI_CAM

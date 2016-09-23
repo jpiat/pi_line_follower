@@ -14,7 +14,7 @@
 #define MIN_ESC 800
 #define CENTER_ESC 1500
 #define MAX_ESC  1700
-#define ARM_ESC_1 800
+#define ARM_ESC_1 1500
 #define ARM_ESC_2 1500
 
 
