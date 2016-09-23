@@ -100,7 +100,7 @@ Mat getFrame() {
 
 #endif
 
-#define STEER_P 0.10
+#define STEER_P -0.20
 #define SPEED_DEC 0.5
 int main(void) {
 	int update = 0;
@@ -137,7 +137,7 @@ int main(void) {
 #endif
 	arm_esc();
 	set_servo_angle(0.0);
-	alive = 1; //to be removed when not debugging
+	//alive = 1; //to be removed when not debugging
 	while (1) {
 		Mat img = getFrame();
 		if (alive == 1) {
@@ -146,8 +146,8 @@ int main(void) {
 				continue;
 			} else {
 				float confidence = detect_line(img, &line, pts, &nb_points);
-				cout << "Confidence " << confidence << endl;
-				if (confidence < 0.25) {
+				//cout << "Confidence " << confidence << endl;
+				if (confidence < 0.35) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
 					detect_line_timeout--;
 					update = 0;
@@ -155,9 +155,9 @@ int main(void) {
 					detect_line_timeout = 10;
 					update = 1;
 				}
-				cout << "line detector used " << nb_points << endl;
+				//cout << "line detector used " << nb_points << endl;
 				if (estimate_ground_speeds(img, &speed)) {
-					cout << "speed " << speed.x << ", " << speed.y << endl;
+					//cout << "speed " << speed.x << ", " << speed.y << endl;
 					travelled_distance += sqrt(
 							pow(speed.x, 2) + pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
@@ -173,10 +173,10 @@ int main(void) {
 							- (abs(angle_from_steering) * SPEED_DEC);
 					speed_from_steering *= speed_factor;
 					//TODO: apply command to servo and esc
-					//cout << "speed factor:" << speed_factor << endl ;
-					//cout << "speed :" << speed_from_steering << endl ;
-					//cout << "steering :" << angle_from_steering << endl ;
-					set_esc_speed(speed_from_steering);
+					/*cout << "speed factor:" << speed_factor << endl ;
+					cout << "speed :" << speed_from_steering << endl ;
+					cout << "steering :" << angle_from_steering << endl ;*/
+					//set_esc_speed(speed_from_steering);
 					set_servo_angle(angle_from_steering);
 				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
@@ -184,7 +184,7 @@ int main(void) {
 						|| detect_line_timeout <= 0) {
 					cout << "distance travelled " << endl;
 					alive = 0;
-					set_esc_speed(0.);
+					//set_esc_speed(0.);
 					set_servo_angle(0.);
 					close_servo();
 					sleep(2);
