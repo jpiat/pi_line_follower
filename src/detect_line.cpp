@@ -74,6 +74,7 @@ float distance_to_curve(curve * l, float x, float y) {
 #define RANSAC_INLIER_LIMIT 2.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i;
+	//Should move dynamic memory allocation to static
 	float * x = (float *) malloc(nb_pts * sizeof(float));
 	float * y = (float *) malloc(nb_pts * sizeof(float));
 	char * used = (char *) malloc(nb_pts * sizeof(char));
