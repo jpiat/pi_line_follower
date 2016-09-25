@@ -109,7 +109,7 @@ Mat getFrame() {
 #define STEER_P -0.20
 #define SPEED_DEC 0.5
 #define ACC_FACTOR 0.1
-int main(void) {
+int main(int argc, char ** argv) {
 	double time_frame  = 0 ;
 	unsigned int fps = 0 ;
 	int update = 0;
@@ -130,15 +130,15 @@ int main(void) {
 	float y_lookahead;
 	init_line_detector();
 	init_visual_odometry();
-#ifdef DEBUG
+/*#ifdef DEBUG
 	if(argc > 1) {
 		cout << "Need a path to video in testing" << endl;
 		exit(-1);
 	}
 	initCaptureFromFile(argv[1]);
-#else
+#else*/
 	initCaptureFromCam();
-#endif
+//#endif
 
 	init_servo();
 #ifdef __arm__
@@ -151,6 +151,10 @@ int main(void) {
 	while (1) {
 		Mat img = getFrame();
 		if (alive == 1) {
+/*#ifdef DEBUG
+	imshow("view", img);
+	waitKey(1);
+#endif*/
 			tic ;
 			if (frame_counter > 0) {
 				frame_counter--;
@@ -160,12 +164,12 @@ int main(void) {
 #ifdef DEBUG
 				cout << "Confidence " << confidence << endl;
 #endif
-				if (confidence < 0.25) {
+				if (confidence < 0.30) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
 					detect_line_timeout--;
 					update = 0;
 				} else {
-					detect_line_timeout = 10;
+					detect_line_timeout = (FPS/2);
 					update = 1;
 					int i ;
 					float u, v ;
@@ -206,9 +210,9 @@ int main(void) {
 
 					//TODO: apply command to servo and esc
 #ifdef DEBUG
-					/*cout << "speed factor:" << speed_factor << endl ;
+					cout << "speed factor:" << speed_factor << endl ;
 					cout << "speed :" << speed_from_steering << endl ;
-					cout << "steering :" << angle_from_steering << endl ;*/
+					cout << "steering :" << angle_from_steering << endl ;
 #endif
 					//set_esc_speed(current_speed);
 					set_servo_angle(angle_from_steering);
