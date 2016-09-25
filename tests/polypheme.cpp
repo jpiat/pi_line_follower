@@ -1,5 +1,6 @@
 #include "camera_parameters.h"
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <math.h>
 #include "opencv2/videoio/videoio.hpp"
@@ -130,6 +131,8 @@ int main(int argc, char ** argv) {
 	curve line;
 	fxy speed;
 	float y_lookahead;
+	ofstream log_file;
+	log_file.open ("polypheme.log");
 	init_line_detector();
 	init_visual_odometry();
 /*#ifdef DEBUG
@@ -172,8 +175,7 @@ int main(int argc, char ** argv) {
 					update = 0;
 				} else {
 					detect_line_timeout = (FPS/2);
-					update = 1;
-					int i ;
+					update = 1;					int i ;
 					float u, v ;
 #ifdef DEBUG
 					memset(map_image.data, 255, map_image.step*map_image.rows);
@@ -186,15 +188,21 @@ int main(int argc, char ** argv) {
 #endif
 				}
 				//cout << "line detector used " << nb_points << endl;
-				if (estimate_ground_speeds(img, &speed)) {
+				int speed_pop = estimate_ground_speeds(img, &speed) ;
+				if (speed_pop > 0) {
 #ifdef DEBUG
 					cout << "speed " << speed.x << ", " << speed.y << endl;
 #endif
 					travelled_distance += sqrt(
 							pow(speed.x, 2) + pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
-					cout << "Travelled distance : " << travelled_distance << " mm" << endl ;
+#ifdef DEBUG
+	cout << "Travelled distance : " << travelled_distance << " mm" << endl ;
+#endif
 				}
+				log_file << line.p[0] << "; " << line.p[1] << "; " << line.p[2] << "; ";
+				log_file << line.min_x << "; " << line.max_x << "; " << confidence << "; ";
+				log_file << speed.x << "; " << speed.y << "; " << speed_pop <<endl;
 				//imshow("img", img);
 				//waitKey(0);
 				if (update == 1) {
@@ -222,12 +230,13 @@ int main(int argc, char ** argv) {
 				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
 				if (travelled_distance >= DISTANCE_TO_TRAVEL
-						/*|| detect_line_timeout <= 0*/) {
+						|| detect_line_timeout <= 0) {
 					if(detect_line_timeout <= 0){
 						cout << "Line lost " << endl;
 					}else{
 						cout << "distance travelled " << endl;
 					}
+					log_file.close();
 					alive = 0;
 					//set_esc_speed(0.);
 					set_servo_angle(0.);

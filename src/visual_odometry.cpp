@@ -162,7 +162,7 @@ unsigned int get_match_score(binary_descriptor * d0, binary_descriptor * d1) {
 #define SPEED_Y_STEP ((SPEED_Y_MAX - SPEED_Y_MIN)/((float) HOUGH_Y))
 
 //hough vote to get average speed for x and y
-void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
+int hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 		float * speed_y) {
 	int i, j;
 	int max = 0, max_index = -1;
@@ -194,10 +194,13 @@ void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 		}
 	}
 //	cout << " max pop is " << nb_pop_max << endl ;
-	(*speed_x) /= nb_pop_max;
-	(*speed_y) /= nb_pop_max;
+	if(nb_pop_max > 0){
+		(*speed_x) /= nb_pop_max;
+		(*speed_y) /= nb_pop_max;
+	}
 	free(vote_space);
 	free(vote_space_pop);
+	return nb_pop_max ;
 }
 
 #define FAST_THRESHOLD 50
@@ -214,7 +217,9 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 			(last_line_to_sample - first_line_to_sample), img.step,
 			FAST_THRESHOLD, &nb_corners);
 	init_stack(current_stack, STACK_SIZE);
-//	cout << "found " << nb_corners << " corners" << endl ;
+#ifdef DEBUG
+	cout << "found " << nb_corners << " corners" << endl ;
+#endif
 	for (i = 0; i < nb_corners; i++) {
 		corners[i].y += first_line_to_sample;
 		feature * current = (feature *) malloc(sizeof(feature));
@@ -271,9 +276,9 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		 }*/
 //		cout << "found "<< flow_vector_size << " vectors " << endl ;
 		if(flow_vector_size > 10){
-			hough_votes(flow_vectors, flow_vector_size, &(speed->x), &(speed->y));
+			int nb_pop = hough_votes(flow_vectors, flow_vector_size, &(speed->x), &(speed->y));
 			free(flow_vectors);
-			return 1 ;
+			return nb_pop ;
 		}else{
 			free(flow_vectors);
 			return 0 ;
