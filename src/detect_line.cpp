@@ -70,7 +70,7 @@ float distance_to_curve(curve * l, float x, float y) {
 }
 
 #define RANSAC_LIST (POLY_LENGTH)
-#define RANSAC_NB_LOOPS 10
+#define RANSAC_NB_LOOPS 15
 #define RANSAC_INLIER_LIMIT 2.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i;
