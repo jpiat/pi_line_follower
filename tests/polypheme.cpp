@@ -193,6 +193,7 @@ int main(int argc, char ** argv) {
 					travelled_distance += sqrt(
 							pow(speed.x, 2) + pow(speed.y, 2));
 					//TODO: use a kind of PID for the ESC control or map the robot position using integral of speed over time
+					cout << "Travelled distance : " << travelled_distance << " mm" << endl ;
 				}
 				//imshow("img", img);
 				//waitKey(0);
@@ -221,7 +222,7 @@ int main(int argc, char ** argv) {
 				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
 				if (travelled_distance >= DISTANCE_TO_TRAVEL
-						|| detect_line_timeout <= 0) {
+						/*|| detect_line_timeout <= 0*/) {
 					if(detect_line_timeout <= 0){
 						cout << "Line lost " << endl;
 					}else{

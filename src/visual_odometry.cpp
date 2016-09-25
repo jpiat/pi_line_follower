@@ -110,6 +110,8 @@ comp_vect * initBriefPattern(comp_vect * pattern, int size) {
 
 binary_descriptor * compute_descriptor(Mat &img, xy pos) {
 	unsigned int i, byte_index = 0, bit_count = 0;
+	int x_top_left = pos.x - (DESCRIPTOR_WINDOW/2) ;
+	int y_top_left = pos.y - (DESCRIPTOR_WINDOW/2) ;
 	binary_descriptor * desc;
 	desc = (binary_descriptor *) malloc(sizeof(binary_descriptor));
 	for (i = 0; i < DESCRIPTOR_LENGTH; i++) {
@@ -118,10 +120,10 @@ binary_descriptor * compute_descriptor(Mat &img, xy pos) {
 		int ly = briefPattern[i][2];
 		int py = briefPattern[i][3];
 		(*desc)[byte_index] = (*desc)[byte_index] << 1;
-		unsigned int gauss_value_p = img.at<unsigned char>(lx + pos.y,
-				px + pos.x);
-		unsigned int gauss_value_n = img.at<unsigned char>(ly + pos.y,
-				py + pos.x);
+		unsigned int gauss_value_p = img.at<unsigned char>(lx + y_top_left,
+				px + x_top_left);
+		unsigned int gauss_value_n = img.at<unsigned char>(ly + y_top_left,
+				py + x_top_left);
 		if (gauss_value_n > gauss_value_p) {
 			(*desc)[byte_index] |= 0x1;
 		} else {
@@ -163,7 +165,7 @@ unsigned int get_match_score(binary_descriptor * d0, binary_descriptor * d1) {
 void hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 		float * speed_y) {
 	int i, j;
-	int max = 0, max_index;
+	int max = 0, max_index = -1;
 	float * vote_space = (float *) malloc(HOUGH_X * HOUGH_Y * sizeof(int));
 	float * vote_space_pop = (float *) malloc(nb_flows * sizeof(unsigned int));
 	memset(vote_space, 0, sizeof(int) * HOUGH_X * HOUGH_Y);
@@ -227,7 +229,7 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 	free(corners); //corners where copied in feature, it can be freed
 	if (last_stack != NULL) {
 		for (i = 0; i < current_stack->nb; i++) {
-			feature * f0;
+			feature * f0 = NULL;
 			get_stack_at(current_stack, i, &f0);
 			for (j = 0; j < last_stack->nb; j++) {
 				feature * f1;
