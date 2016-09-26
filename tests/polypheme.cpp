@@ -237,8 +237,13 @@ int main(int argc, char ** argv) {
 					set_servo_angle(angle_from_steering);
 				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
+#ifdef VO
 				if (travelled_distance >= DISTANCE_TO_TRAVEL
 						|| detect_line_timeout <= 0) {
+#else
+					if (falling_edge == 1
+											|| detect_line_timeout <= 0){
+#endif
 					if(detect_line_timeout <= 0){
 						cout << "Line lost " << endl;
 					}else{

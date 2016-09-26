@@ -25,8 +25,8 @@ void distort_radial(double * K, float u, float v, float * ud, float * vd,
 void undistort_radial(double * K, float ud, float vd, float * u, float * v,
 		double * poly, unsigned int poly_size) {
 	unsigned int i = 0;
-	double xn = (ud - K[2]) / K[0]; //vers plan image normalisé avec origine en axe principale et unité métrique
-	double yn = (vd - K[5]) / K[4];
+	double xn = (ud - K[6]) / K[0]; //vers plan image normalisé avec origine en axe principale et unité métrique
+	double yn = (vd - K[7]) / K[4];
 	double r_square = xn * xn + yn * yn;
 	double exp_x = r_square;
 	double k = 1.0;
