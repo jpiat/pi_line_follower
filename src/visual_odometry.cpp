@@ -110,8 +110,8 @@ comp_vect * initBriefPattern(comp_vect * pattern, int size) {
 
 binary_descriptor * compute_descriptor(Mat &img, xy pos) {
 	unsigned int i, byte_index = 0, bit_count = 0;
-	int x_top_left = pos.x - (DESCRIPTOR_WINDOW/2) ;
-	int y_top_left = pos.y - (DESCRIPTOR_WINDOW/2) ;
+	int x_top_left = pos.x - (DESCRIPTOR_WINDOW / 2);
+	int y_top_left = pos.y - (DESCRIPTOR_WINDOW / 2);
 	binary_descriptor * desc;
 	desc = (binary_descriptor *) malloc(sizeof(binary_descriptor));
 	for (i = 0; i < DESCRIPTOR_LENGTH; i++) {
@@ -178,7 +178,8 @@ int hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 		int indx = (flow[i].x - SPEED_X_MIN) / SPEED_X_STEP;
 		int indy = (flow[i].y - SPEED_Y_MIN) / SPEED_Y_STEP;
 //		cout << "vote index : "<<indx << ", " << indy << endl ;
-		if(indx > HOUGH_X || indy > HOUGH_Y || indx < 0 || indy < 0) continue ; //does not fit the model
+		if (indx > HOUGH_X || indy > HOUGH_Y || indx < 0 || indy < 0)
+			continue; //does not fit the model
 		vote_space[(indy * HOUGH_X) + indx]++;
 		vote_space_pop[i] = (indy * HOUGH_X) + indx;
 		if (vote_space[(indy * HOUGH_X) + indx] > max) {
@@ -194,13 +195,13 @@ int hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 		}
 	}
 //	cout << " max pop is " << nb_pop_max << endl ;
-	if(nb_pop_max > 0){
+	if (nb_pop_max > 0) {
 		(*speed_x) /= nb_pop_max;
 		(*speed_y) /= nb_pop_max;
 	}
 	free(vote_space);
 	free(vote_space_pop);
-	return nb_pop_max ;
+	return nb_pop_max;
 }
 
 #define FAST_THRESHOLD 50
@@ -218,7 +219,7 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 			FAST_THRESHOLD, &nb_corners);
 	init_stack(current_stack, STACK_SIZE);
 #ifdef DEBUG
-	cout << "found " << nb_corners << " corners" << endl ;
+	cout << "found " << nb_corners << " corners" << endl;
 #endif
 	for (i = 0; i < nb_corners; i++) {
 		corners[i].y += first_line_to_sample;
@@ -226,8 +227,10 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		current->pos.x = corners[i].x;
 		current->pos.y = corners[i].y;
 		current->desc = compute_descriptor(img, corners[i]);
+#ifdef DEBUG
 		circle(img, Point(corners[i].x, corners[i].y), 2, Scalar(0, 0, 0, 0), 2,
 				8, 0);
+#endif
 		if (push_stack(current_stack, current) == 0)
 			break;
 	}
@@ -245,11 +248,14 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 				if (score < DESCRIPTOR_MATCH_THRESHOLD) {
 					//project in robot frame
 					float gp0x, gp0y, gp1x, gp1y;
+					float ip0x, ip0y, ip1x, ip1y;
 					//should distort point before projection
-					pixel_to_ground_plane(cam_ct, f0->pos.x, f0->pos.y, &gp0x,
-							&gp0y);
-					pixel_to_ground_plane(cam_ct, f1->pos.x, f1->pos.y, &gp1x,
-							&gp1y);
+					undistort_radial(K, (float) f0->pos.x, (float) f0->pos.y,
+							&(ip0x), &(ip0y), radial_undistort, 2);
+					undistort_radial(K, (float) f1->pos.x, (float) f1->pos.y,
+							&(ip1x), &(ip1y), radial_undistort, 2);
+					pixel_to_ground_plane(cam_ct, ip0x, ip0y, &gp0x, &gp0y);
+					pixel_to_ground_plane(cam_ct, ip1x, ip1y, &gp1x, &gp1y);
 					flow_vectors[flow_vector_size].x = gp1x - gp0x;
 					flow_vectors[flow_vector_size].y = gp1y - gp0y;
 					flow_vector_size++;
@@ -270,28 +276,20 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		}
 		free(last_stack);
 		last_stack = current_stack;
-
-		/*for (i = 0; i < flow_vector_size; i++) {
-		 cout << flow_vectors[i].x << ", " << flow_vectors[i].y << endl;
-		 }*/
-//		cout << "found "<< flow_vector_size << " vectors " << endl ;
-		if(flow_vector_size > 10){
-			int nb_pop = hough_votes(flow_vectors, flow_vector_size, &(speed->x), &(speed->y));
+		if (flow_vector_size > 10) {
+			int nb_pop = hough_votes(flow_vectors, flow_vector_size,
+					&(speed->x), &(speed->y));
 			free(flow_vectors);
-			return nb_pop ;
-		}else{
+			return nb_pop;
+		} else {
 			free(flow_vectors);
-			return 0 ;
+			return 0;
 		}
 	} else {
 		free(flow_vectors);
 		last_stack = current_stack;
 		return 0; //exchange for the next frame
 	}
-
-	//Can now process the vectors in ground plane
-	//Find a set of point that matches a movement model
-	//Update movement model
 }
 
 void init_visual_odometry() {
@@ -309,7 +307,7 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
-	int success ;
+	int success;
 	fxy speed;
 	init_visual_odometry();
 	Mat first_image, second_image;
@@ -319,12 +317,12 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 	tic
 	success = estimate_ground_speeds(second_image, &speed);
 	toc
-	if(success){
+	if (success) {
 		cout << speed.x << ", " << speed.y << endl;
-	}else{
-		cout << "Cannot estimate speed" << endl ;
+	} else {
+		cout << "Cannot estimate speed" << endl;
 	}
-	
+
 	imshow("first", first_image);
 	imshow("second", second_image);
 	waitKey(0);

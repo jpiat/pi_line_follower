@@ -7,6 +7,7 @@
 
 //all the following is computed with matlab calibration toolbox ...
 extern double radial_distort[2];
+extern double radial_undistort[2];
 
 //Eigen expect buffer to be constructed in column first
 extern double K[9];

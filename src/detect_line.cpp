@@ -197,7 +197,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 	}
 	free(sampled_lines);
 	for (i = 0; i < (*nb_pts); i++) {
-		//undistort_radial(K, pts[i].x, pts[i].y, &(pts[i].x), &(pts[i].y),radial_distort, 2);
+		undistort_radial(K, pts[i].x, pts[i].y, &(pts[i].x), &(pts[i].y),radial_undistort, 2);
 		pixel_to_ground_plane(cam_ct, pts[i].x, pts[i].y, &(pts[i].x),
 				&(pts[i].y));
 	}
