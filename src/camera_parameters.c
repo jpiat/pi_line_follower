@@ -1,6 +1,8 @@
 //all the following is computed with matlab calibration toolbox ...
 double radial_distort[2] = { -0.3070, 0.1031 }; // need to inverse functions to compute undistort coordinates
-double radial_undistort[2] = { -0.0375, 0.0006 };
+
+#define POLY_UNDISTORT_SIZE 3
+double radial_undistort[POLY_UNDISTORT_SIZE] = {0.2247,    0.6693,   -0.6153};
 //Eigen expect buffer to be constructed in column first
 double K[9] = { 443.4681, 0, 0, 0, 442.9819, 0, 326.2723, 233.9095, 1.0000 };
 //pose is extracted from Matlab and then shifted to have centered Y

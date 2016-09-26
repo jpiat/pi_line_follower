@@ -82,8 +82,9 @@ comp_vect * initBriefPattern(comp_vect * pattern, int size) {
 		pattern[i][0] = rand_a_b_brief(0, DESCRIPTOR_WINDOW);
 		pattern[i][1] = rand_a_b_brief(0, DESCRIPTOR_WINDOW);
 		if (i % 32 == 0 && dist_min > 4) {
-			dist_min = dist_min / 2;
-			dist_max -= dist_min;
+			dist_min = dist_min /2;
+			if(dist_min < 4) dist_min = 4 ;
+			dist_max = dist_max * 0.75 ;
 		}
 		float dec_c, dec_l;
 		int pos_l, pos_c;
@@ -146,10 +147,28 @@ unsigned int get_match_score(binary_descriptor * d0, binary_descriptor * d1) {
 	for (i = 0; i < (DESCRIPTOR_LENGTH / 32); i++) {
 		unsigned long int xored = bits1_32[i] ^ bits2_32[i];
 		dist += __builtin_popcount(xored);
-		if (dist >= DESCRIPTOR_MATCH_THRESHOLD)
-			break; //don't try harder if this not a match
+		if (dist > DESCRIPTOR_MATCH_THRESHOLD)
+			return dist; //don't try harder if this not a match
 	}
 	return dist;
+}
+
+void showPatch(unsigned char * img, char * title, unsigned int w,
+		unsigned int h, unsigned int offset_x, unsigned int offset_y) {
+	Mat image(Size(w, h), CV_8UC1);
+	image.data = (unsigned char *) img;
+	image.step = w;
+	Mat patchImageUp(Size(20 * DESCRIPTOR_WINDOW, 20 * DESCRIPTOR_WINDOW),
+	CV_8UC1);
+
+	Mat patchImage(image,
+			Rect(offset_x - (DESCRIPTOR_WINDOW / 2),
+					offset_y - (DESCRIPTOR_WINDOW / 2), DESCRIPTOR_WINDOW,
+					DESCRIPTOR_WINDOW));
+	resize(patchImage, patchImageUp, patchImageUp.size(), 0, 0, INTER_CUBIC);
+	imshow(title, patchImageUp);
+	waitKey(0);
+	patchImageUp.release();
 }
 
 #define HOUGH_X 30
@@ -204,7 +223,7 @@ int hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 	return nb_pop_max;
 }
 
-#define FAST_THRESHOLD 50
+#define FAST_THRESHOLD 80
 int estimate_ground_speeds(Mat & img, fxy * speed) {
 	unsigned int i, j;
 	int nb_corners;
@@ -226,10 +245,12 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		feature * current = (feature *) malloc(sizeof(feature));
 		current->pos.x = corners[i].x;
 		current->pos.y = corners[i].y;
+			/*	showPatch(img.data, "patch", img.cols, img.rows,
+		 corners[i].x, corners[i].y);*/
 		current->desc = compute_descriptor(img, corners[i]);
 #ifdef DEBUG
-		circle(img, Point(corners[i].x, corners[i].y), 2, Scalar(0, 0, 0, 0), 2,
-				8, 0);
+		circle(img, Point(current->pos.x, current->pos.y), 2,
+				Scalar(0, 0, 0, 0), 2, 8, 0);
 #endif
 		if (push_stack(current_stack, current) == 0)
 			break;
@@ -238,6 +259,8 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 	if (last_stack != NULL) {
 		for (i = 0; i < current_stack->nb; i++) {
 			feature * f0 = NULL;
+			unsigned int best_score = DESCRIPTOR_MATCH_THRESHOLD;
+			unsigned int best_score_index = 0;
 			get_stack_at(current_stack, i, &f0);
 			for (j = 0; j < last_stack->nb; j++) {
 				feature * f1;
@@ -245,25 +268,37 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 				if (f1 == NULL)
 					continue;
 				unsigned int score = get_match_score(f1->desc, f0->desc);
-				if (score < DESCRIPTOR_MATCH_THRESHOLD) {
-					//project in robot frame
-					float gp0x, gp0y, gp1x, gp1y;
-					float ip0x, ip0y, ip1x, ip1y;
-					//should distort point before projection
-					undistort_radial(K, (float) f0->pos.x, (float) f0->pos.y,
-							&(ip0x), &(ip0y), radial_undistort, 2);
-					undistort_radial(K, (float) f1->pos.x, (float) f1->pos.y,
-							&(ip1x), &(ip1y), radial_undistort, 2);
-					pixel_to_ground_plane(cam_ct, ip0x, ip0y, &gp0x, &gp0y);
-					pixel_to_ground_plane(cam_ct, ip1x, ip1y, &gp1x, &gp1y);
-					flow_vectors[flow_vector_size].x = gp1x - gp0x;
-					flow_vectors[flow_vector_size].y = gp1y - gp0y;
-					flow_vector_size++;
-					free(f1->desc);
-					free(f1);
-					set_stack_at(last_stack, j, NULL);
-					break;
+				if (score < best_score) {
+					best_score = score;
+					best_score_index = j;
 				}
+			}
+			if (best_score < DESCRIPTOR_MATCH_THRESHOLD) {
+				feature * f1;
+				get_stack_at(last_stack, best_score_index, &f1);
+				//project in robot frame
+				float gp0x, gp0y, gp1x, gp1y;
+				float ip0x, ip0y, ip1x, ip1y;
+#ifdef DEBUG
+				line(img, Point(f0->pos.x, f0->pos.y),
+						Point(f1->pos.x, f1->pos.y), Scalar(255, 0, 0, 0), 2, 8,
+						0);
+#endif
+				//should distort point before projection
+				undistort_radial(K, (float) f0->pos.x, (float) f0->pos.y,
+						&(ip0x), &(ip0y), radial_undistort,
+						POLY_UNDISTORT_SIZE);
+				undistort_radial(K, (float) f1->pos.x, (float) f1->pos.y,
+						&(ip1x), &(ip1y), radial_undistort,
+						POLY_UNDISTORT_SIZE);
+				pixel_to_ground_plane(cam_ct, ip0x, ip0y, &gp0x, &gp0y);
+				pixel_to_ground_plane(cam_ct, ip1x, ip1y, &gp1x, &gp1y);
+				flow_vectors[flow_vector_size].x = gp1x - gp0x;
+				flow_vectors[flow_vector_size].y = gp1y - gp0y;
+				flow_vector_size++;
+				free(f1->desc);
+				free(f1);
+				set_stack_at(last_stack, best_score_index, NULL);
 			}
 		}
 		while (last_stack->nb > 0) {
@@ -276,7 +311,7 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		}
 		free(last_stack);
 		last_stack = current_stack;
-		if (flow_vector_size > 10) {
+		if (flow_vector_size > 4) {
 			int nb_pop = hough_votes(flow_vectors, flow_vector_size,
 					&(speed->x), &(speed->y));
 			free(flow_vectors);
@@ -317,8 +352,8 @@ int test_estimate_ground_speeds(int argc, char ** argv) {
 	tic
 	success = estimate_ground_speeds(second_image, &speed);
 	toc
-	if (success) {
-		cout << speed.x << ", " << speed.y << endl;
+	if (success > 0) {
+		cout << success << ", " << speed.x << ", " << speed.y << endl;
 	} else {
 		cout << "Cannot estimate speed" << endl;
 	}

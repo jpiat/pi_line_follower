@@ -7,7 +7,8 @@
 
 //all the following is computed with matlab calibration toolbox ...
 extern double radial_distort[2];
-extern double radial_undistort[2];
+#define POLY_UNDISTORT_SIZE 3
+extern double radial_undistort[POLY_UNDISTORT_SIZE];
 
 //Eigen expect buffer to be constructed in column first
 extern double K[9];
