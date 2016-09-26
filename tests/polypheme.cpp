@@ -130,6 +130,8 @@ int main(int argc, char ** argv) {
 	point pts[16];
 	curve line;
 	fxy speed;
+	speed.x = 0. ;
+	speed.y = 0. ;
 	float y_lookahead;
 	ofstream log_file;
 	log_file.open ("polypheme.log");
@@ -188,6 +190,7 @@ int main(int argc, char ** argv) {
 #endif
 				}
 				//cout << "line detector used " << nb_points << endl;
+#ifdef VO
 				int speed_pop = estimate_ground_speeds(img, &speed) ;
 				if (speed_pop > 0) {
 #ifdef DEBUG
@@ -200,6 +203,11 @@ int main(int argc, char ** argv) {
 	cout << "Travelled distance : " << travelled_distance << " mm" << endl ;
 #endif
 				}
+#else
+				int speed_pop = 0 ;
+				speed.x = 0 ;
+				speed.y = 0 ;
+#endif
 				log_file << line.p[0] << "; " << line.p[1] << "; " << line.p[2] << "; ";
 				log_file << line.min_x << "; " << line.max_x << "; " << confidence << "; ";
 				log_file << speed.x << "; " << speed.y << "; " << speed_pop <<endl;

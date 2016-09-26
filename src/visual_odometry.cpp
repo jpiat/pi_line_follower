@@ -82,9 +82,10 @@ comp_vect * initBriefPattern(comp_vect * pattern, int size) {
 		pattern[i][0] = rand_a_b_brief(0, DESCRIPTOR_WINDOW);
 		pattern[i][1] = rand_a_b_brief(0, DESCRIPTOR_WINDOW);
 		if (i % 32 == 0 && dist_min > 4) {
-			dist_min = dist_min /2;
-			if(dist_min < 4) dist_min = 4 ;
-			dist_max = dist_max * 0.75 ;
+			dist_min = dist_min / 2;
+			if (dist_min < 4)
+				dist_min = 4;
+			dist_max = dist_max * 0.75;
 		}
 		float dec_c, dec_l;
 		int pos_l, pos_c;
@@ -206,24 +207,26 @@ int hough_votes(fxy * flow, unsigned int nb_flows, float * speed_x,
 			max_index = (indy * HOUGH_X) + indx;
 		}
 	}
-	for (i = 0; i < nb_flows; i++) {
-		if (vote_space_pop[i] == max_index) {
-			nb_pop_max++;
-			(*speed_x) += flow[i].x;
-			(*speed_y) += flow[i].y;
+	if (max_index >= 0 && max > 4) {
+		for (i = 0; i < nb_flows; i++) {
+			if (vote_space_pop[i] == max_index) {
+				nb_pop_max++;
+				(*speed_x) += flow[i].x;
+				(*speed_y) += flow[i].y;
+			}
 		}
-	}
 //	cout << " max pop is " << nb_pop_max << endl ;
-	if (nb_pop_max > 0) {
-		(*speed_x) /= nb_pop_max;
-		(*speed_y) /= nb_pop_max;
+		if (nb_pop_max > 4) {
+			(*speed_x) /= nb_pop_max;
+			(*speed_y) /= nb_pop_max;
+		}
 	}
 	free(vote_space);
 	free(vote_space_pop);
 	return nb_pop_max;
 }
 
-#define FAST_THRESHOLD 80
+#define FAST_THRESHOLD 90
 int estimate_ground_speeds(Mat & img, fxy * speed) {
 	unsigned int i, j;
 	int nb_corners;
@@ -245,7 +248,7 @@ int estimate_ground_speeds(Mat & img, fxy * speed) {
 		feature * current = (feature *) malloc(sizeof(feature));
 		current->pos.x = corners[i].x;
 		current->pos.y = corners[i].y;
-			/*	showPatch(img.data, "patch", img.cols, img.rows,
+		/*	showPatch(img.data, "patch", img.cols, img.rows,
 		 corners[i].x, corners[i].y);*/
 		current->desc = compute_descriptor(img, corners[i]);
 #ifdef DEBUG
