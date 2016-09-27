@@ -6,7 +6,6 @@
 #include "opencv2/videoio/videoio.hpp"
 #include "opencv2/core/core.hpp"
 
-
 #include "detect_line.hpp"
 #include "visual_odometry.hpp"
 #include "navigation.hpp"
