@@ -1,6 +1,6 @@
 #define IMAGE_WIDTH 640
 #define IMAGE_HEIGHT 480
-#define FPS 30
+#define FPS 60
 #define HFLIP 0
 #define VFLIP 0
 

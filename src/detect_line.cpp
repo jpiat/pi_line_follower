@@ -202,7 +202,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 				&(pts[i].y));
 	}
 
-	if ((*nb_pts) > (POLY_LENGTH * 2)) {
+	if ((*nb_pts) > ((POLY_LENGTH * 2) - 1)) {
 		return fit_line(pts, (*nb_pts), l);
 	} else {
 		return 0.;
