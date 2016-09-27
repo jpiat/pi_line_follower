@@ -227,12 +227,12 @@ int main(int argc, char ** argv) {
 					cout << "Current heading" << heading << endl ;*/
 					cout << "Heading distance " << heading_distance << endl ;
 #endif
-					if(heading_state == 0 && heading_distance > 40.){
+					if(heading_state == 0 && heading_distance > 45.){
 						 heading_state = 1;
 						cout << "Away from start" << endl ;
 					}else if(heading_distance < 10. && heading_state == 1){
 						cout << "Back to start" << endl;
-						heading_timeout = FPS * 3 ;
+						heading_timeout = FPS * 2 ;
 						heading_state = 2 ;
 					} else if(heading_distance < 10. && heading_state == 2 && heading_timeout > 0){
 						heading_timeout -- ;
