@@ -23,10 +23,10 @@ OBJ_FILES+=$(CPP_SRC_FILES:.cpp=.o)
 
 OBJS=$(addprefix ${OBJS_DIR},${OBJ_FILES})
 
-all : test_detect_line test_visual_odometry test_servo
+all : test_detect_line test_visual_odometry test_servo polypheme test_compass
 
 clean :
-	rm -Rf ${OBJS_DIR} test_detect_line
+	rm -Rf ${OBJS_DIR} test_detect_line test_compass test_servo polypheme test_visual_odometry
 	
 polypheme : ${OBJS_DIR}/polypheme.o ${OBJS}
 	g++ -o $@ ${OBJS_DIR}/polypheme.o ${OBJS} ${LDFLAGS}
