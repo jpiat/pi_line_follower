@@ -1,5 +1,5 @@
 LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_videoio -lpigpio -lwiringPi -lraspicamcv
-CFLAGS=-O3 -Wall -Iinc/ -Iinc/Eigen -DPI_CAM -mfpu=vfp
+CFLAGS=-O3 -Wall -Iinc/ -Iinc/Eigen -DPI_CAM -mfpu=vfp ${MODE}
 
 VPATH=src:src/fast:tests
 

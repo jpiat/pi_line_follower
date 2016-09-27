@@ -235,7 +235,7 @@ int main(int argc, char ** argv) {
 						cout << "Back to start" << endl;
 						heading_timeout = FPS * 2 ;
 						heading_state = 2 ;
-					} else if(heading_distance < 10. && heading_state == 2 && heading_timeout > 0){
+					} else if(heading_distance < 15. && heading_state == 2 && heading_timeout > 0){
 						heading_timeout -- ;
 					}
 
@@ -267,7 +267,9 @@ int main(int argc, char ** argv) {
 					cout << "speed :" << speed_from_steering << endl ;
 					cout << "steering :" << angle_from_steering << endl ;
 #endif
-					//set_esc_speed(current_speed);
+#ifdef	RUN
+					set_esc_speed(current_speed);
+#endif
 					set_servo_angle(angle_from_steering);
 				}
 
@@ -291,7 +293,7 @@ int main(int argc, char ** argv) {
 					}
 					log_file.close();
 					alive = 0;
-					//set_esc_speed(0.);
+					set_esc_speed(0.);
 					set_servo_angle(0.);
 					close_servo();
 					sleep(2);
