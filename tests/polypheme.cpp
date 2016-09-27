@@ -41,7 +41,7 @@ int initCaptureFromCam() {
 	config->height=IMAGE_HEIGHT;
 	config->bitrate=0;      // zero: leave as default
 	config->framerate=FPS;
-	config->monochrome=1;
+	config->monochrome=0;
 	properties->hflip = HFLIP;
 	properties->vflip = VFLIP;
 	properties -> sharpness = 0;
@@ -127,6 +127,8 @@ int main(int argc, char ** argv) {
 	double travelled_distance = 0.;
 	Mat map_image(320, 320,
 	CV_8UC1, Scalar(255));
+	Mat gray_img(IMAGE_HEIGHT, IMAGE_WIDTH, CV_8UC1);
+	Mat roi_hsv(80, 80, CV_8UC3);
 	point pts[16];
 	curve line;
 	fxy speed;
@@ -157,6 +159,7 @@ int main(int argc, char ** argv) {
 	//alive = 1; //to be removed when not debugging
 	while (1) {
 		Mat img = getFrame();
+		cvtColor(img, gray_img, COLOR_BGR2GRAY, 0);
 		if (alive == 1) {
 /*#ifdef DEBUG
 	imshow("view", img);
@@ -167,7 +170,7 @@ int main(int argc, char ** argv) {
 				frame_counter--;
 				continue;
 			} else {
-				float confidence = detect_line(img, &line, pts, &nb_points);
+				float confidence = detect_line(gray_img, &line, pts, &nb_points);
 #ifdef DEBUG
 				cout << "Confidence " << confidence << endl;
 #endif
@@ -191,7 +194,7 @@ int main(int argc, char ** argv) {
 				}
 				//cout << "line detector used " << nb_points << endl;
 #ifdef VO
-				int speed_pop = estimate_ground_speeds(img, &speed) ;
+				int speed_pop = estimate_ground_speeds(gray_img, &speed) ;
 				if (speed_pop > 0) {
 #ifdef DEBUG
 					cout << "speed " << speed.x << ", " << speed.y << endl;
@@ -236,7 +239,14 @@ int main(int argc, char ** argv) {
 					//set_esc_speed(current_speed);
 					set_servo_angle(angle_from_steering);
 				}
-				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
+
+				/*
+				//foireux ...
+				Mat roi_rgb(img, Rect(Point(((IMAGE_WIDTH/2)-40) , (IMAGE_HEIGHT - 81)), Point(((IMAGE_WIDTH/2)+40), (IMAGE_HEIGHT - 1))));
+				cvtColor(roi_rgb, roi_hsv, COLOR_BGR2HSV);
+				//try to detect arrival line color ...
+				if()*/
+
 #ifdef VO
 				if (travelled_distance >= DISTANCE_TO_TRAVEL
 						|| detect_line_timeout <= 0) {
