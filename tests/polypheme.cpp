@@ -7,11 +7,11 @@
 #include "opencv2/core/core.hpp"
 
 
-
-
 #include "detect_line.hpp"
 #include "visual_odometry.hpp"
 #include "navigation.hpp"
+#include "resampling.hpp"
+#include "HMC5883L.hpp"
 
 extern "C" {
 #include "servo_control.h"
@@ -110,7 +110,7 @@ Mat getFrame() {
 #endif
 
 #define STEER_P -0.20
-#define SPEED_DEC 0.5
+#define SPEED_DEC 0.20
 #define ACC_FACTOR 0.1
 int main(int argc, char ** argv) {
 	double time_frame  = 0 ;
@@ -127,6 +127,10 @@ int main(int argc, char ** argv) {
 	double travelled_distance = 0.;
 	Mat map_image(320, 320,
 	CV_8UC1, Scalar(255));
+	short heading_buffer[3];
+	double heading = 0., start_heading = 0.;
+	int heading_timeout = 0, heading_state = 0 ;
+	int arrival_detected = 0 ;
 	point pts[16];
 	curve line;
 	fxy speed;
@@ -136,7 +140,10 @@ int main(int argc, char ** argv) {
 	ofstream log_file;
 	log_file.open ("polypheme.log");
 	init_line_detector();
+#ifdef VO
 	init_visual_odometry();
+#endif
+	init_compass();
 /*#ifdef DEBUG
 	if(argc > 1) {
 		cout << "Need a path to video in testing" << endl;
@@ -157,7 +164,7 @@ int main(int argc, char ** argv) {
 	//alive = 1; //to be removed when not debugging
 	while (1) {
 		Mat img = getFrame();
-		if (alive == 1) {
+		if (alive > 0) {
 /*#ifdef DEBUG
 	imshow("view", img);
 	waitKey(1);
@@ -165,6 +172,11 @@ int main(int argc, char ** argv) {
 			tic ;
 			if (frame_counter > 0) {
 				frame_counter--;
+				if( HMC5883L_GetReadyStatus()){
+                                        start_heading = HMC5883L_GetHeading(heading_buffer);
+					heading_state = 0 ;
+//					cout << "Start heading "<< start_heading << endl ; 
+				}
 				continue;
 			} else {
 				float confidence = detect_line(img, &line, pts, &nb_points);
@@ -208,9 +220,31 @@ int main(int argc, char ** argv) {
 				speed.x = 0 ;
 				speed.y = 0 ;
 #endif
+	 			if( HMC5883L_GetReadyStatus()){
+                			heading = HMC5883L_GetHeading(heading_buffer);
+					double heading_distance = abs(heading - start_heading);
+#ifdef DEBUG
+					/*cout << "Start heading " << start_heading << endl ;
+					cout << "Current heading" << heading << endl ;*/
+					cout << "Heading distance " << heading_distance << endl ;
+#endif
+					if(heading_state == 0 && heading_distance > 40.){
+						 heading_state = 1;
+						cout << "Away from start" << endl ;
+					}else if(heading_distance < 10. && heading_state == 1){
+						cout << "Back to start" << endl;
+						heading_timeout = FPS * 3 ;
+						heading_state = 2 ;
+					} else if(heading_distance < 10. && heading_state == 2 && heading_timeout > 0){
+						heading_timeout -- ;
+					}
+
+				}
+
+
 				log_file << line.p[0] << "; " << line.p[1] << "; " << line.p[2] << "; ";
 				log_file << line.min_x << "; " << line.max_x << "; " << confidence << "; ";
-				log_file << speed.x << "; " << speed.y << "; " << speed_pop <<endl;
+				log_file << speed.x << "; " << speed.y << "; " << speed_pop <<"; "<< heading <<endl;
 				//imshow("img", img);
 				//waitKey(0);
 				if (update == 1) {
@@ -238,16 +272,15 @@ int main(int argc, char ** argv) {
 				}
 				//TODO:detect falling edge on IO or no line was seen for more than 10 frames
 #ifdef VO
-				if (travelled_distance >= DISTANCE_TO_TRAVEL
-						|| detect_line_timeout <= 0) {
+				arrival_detected = (travelled_distance >= DISTANCE_TO_TRAVEL) ? 1 : 0;
 #else
-					if (falling_edge == 1
-											|| detect_line_timeout <= 0){
+				arrival_detected = (heading_state == 2 && heading_timeout == 0) ? 1 : 0 ;
 #endif
+				if (falling_edge == 1 || detect_line_timeout <= 0 || arrival_detected > 0){
 					if(detect_line_timeout <= 0){
 						cout << "Line lost " << endl;
 					}else{
-						cout << "distance travelled " << endl;
+						cout << "Arrival detected " << endl;
 					}
 					log_file.close();
 					alive = 0;

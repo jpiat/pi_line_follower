@@ -1,5 +1,5 @@
 LDFLAGS=-L/usr/local/lib -lm -lrt -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_imgcodecs -lopencv_videoio -lpigpio -lwiringPi -lraspicamcv
-CFLAGS=-O3 -Wall -Iinc/ -Iinc/Eigen -DPI_CAM -mfpu=vfp -DDEBUG
+CFLAGS=-O3 -Wall -Iinc/ -Iinc/Eigen -DPI_CAM -mfpu=vfp
 
 VPATH=src:src/fast:tests
 
@@ -39,6 +39,9 @@ test_visual_odometry : ${OBJS_DIR}/test_visual_odometry.o ${OBJS}
 	
 test_servo: ${OBJS_DIR}/test_servo.o ${OBJS}
 	g++ -o $@ ${OBJS_DIR}/test_servo.o ${OBJS} ${LDFLAGS}
+
+test_compass : ${OBJS_DIR}/test_compass.o ${OBJS}
+	g++ -o $@ ${OBJS_DIR}/test_compass.o ${OBJS} ${LDFLAGS}
 
 ${OBJS_DIR}%.o : %.c
 	mkdir -p ${OBJS_DIR}
