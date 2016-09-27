@@ -109,7 +109,7 @@ Mat getFrame() {
 #endif
 
 #define STEER_P -0.20
-#define SPEED_DEC 0.20
+#define SPEED_DEC 0.10
 #define ACC_FACTOR 0.1
 int main(int argc, char ** argv) {
 	double time_frame  = 0 ;
@@ -184,7 +184,7 @@ int main(int argc, char ** argv) {
 #endif
 				if (confidence < 0.30) {
 					//should we consider updating the command when we have a low confidence in the curve estimate
-					detect_line_timeout--;
+					if(detect_line_timeout > 0) detect_line_timeout--;
 					update = 0;
 				} else {
 					detect_line_timeout = (FPS/2);
