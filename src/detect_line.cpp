@@ -8,7 +8,6 @@
 #include "detect_line.hpp"
 #include "navigation.hpp"
 
-
 #include "camera_parameters.h"
 using namespace std;
 
@@ -27,7 +26,8 @@ double bot_pos_in_world[4];
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
-#define NB_LINES_SAMPLED 16
+#define NB_LINES_HORIZ_SAMPLING 16
+#define NB_LINES_SAMPLED 42
 #define SAMPLE_SPACING_MM 20.0
 
 float posx_samples_world[NB_LINES_SAMPLED];
@@ -39,24 +39,24 @@ float rand_a_b(int a, int b) {
 	return (rand_0_1 * (b - a)) + a;
 }
 
-void kernel_horiz(Mat & img, int * kernel_response, unsigned int v) {
+void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
+		unsigned int u_start, unsigned int u_end) {
 	int i;
-	kernel_response[0] = 0;
+	memset(kernel_response, 0, sizeof(int) * img.cols);
 	unsigned char * upixel_ptr = (unsigned char *) img.data;
-	for (i = 1; i < (img.cols - 1); i++) {
-		int response = 0;
-		response -= upixel_ptr[(v - 1) * img.step + (i - 1)];
-		response -= upixel_ptr[(v) * img.step + (i - 1)];
-		response -= upixel_ptr[(v + 1) * img.step + (i - 1)];
+	for (i = u_start; i < u_end && i < img.cols; i++) {
+		int response_x = 0;
+		response_x -= upixel_ptr[(v - 1) * img.step + (i - 1)];
+		response_x -= 2 * upixel_ptr[(v) * img.step + (i - 1)];
+		response_x -= upixel_ptr[(v + 1) * img.step + (i - 1)];
 
-		response += upixel_ptr[(v - 1) * img.step + (i + 1)];
-		response += upixel_ptr[(v) * img.step + (i + 1)];
-		response += upixel_ptr[(v + 1) * img.step + (i + 1)];
+		response_x += upixel_ptr[(v - 1) * img.step + (i + 1)];
+		response_x += 2 * upixel_ptr[(v) * img.step + (i + 1)];
+		response_x += upixel_ptr[(v + 1) * img.step + (i + 1)];
 
-		kernel_response[i] = response;
+		kernel_response[i] = response_x;
 
 	}
-	kernel_response[i] = 0;
 }
 
 float distance_to_curve(curve * l, float x, float y) {
@@ -70,7 +70,7 @@ float distance_to_curve(curve * l, float x, float y) {
 }
 
 #define RANSAC_LIST (POLY_LENGTH)
-#define RANSAC_NB_LOOPS 15
+#define RANSAC_NB_LOOPS NB_LINES_SAMPLED
 #define RANSAC_INLIER_LIMIT 2.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i;
@@ -147,66 +147,119 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	/*
 	 printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
 	 */
-	float confidence = ((float) (max_consensus))
-			/ ((float) nb_pts);
+	float confidence = ((float) (max_consensus)) / ((float) nb_pts);
 	//printf("Confidence %f \n", confidence);
 
 	return confidence;
 }
+float poly_at(curve * c, float x) {
+	int i;
+	float resp = 0.;
+	for (i = 0; i < POLY_LENGTH; i++) {
+		resp += c->p[i] * pow(x, i);
+	}
+	return resp;
+}
 
+float poly_deriv_at(curve * c, float derivx, float x) {
+	int i;
+	float resp = 0.;
+	for (i = 1; i < POLY_LENGTH; i++) {
+		resp += c->p[i] * pow(derivx, (i - 1));
+	}
+	resp = (resp * (x - derivx)) + poly_at(c, derivx);
+	return resp;
+}
 
-#define SCORE_THRESHOLD 300
+#define SCORE_THRESHOLD 200
 #define WIDTH_THRESHOLD 100
+float extract_line_pos(int * horizontal_gradient, unsigned int line_size) {
+	int j;
+	int max = 0, min = 0, max_index = 0, min_index = 0, sig = 0;
+	int score, width;
+	for (j = 1; j < line_size; j++) {
+		//Track is white on black, so we expect maximum gradient then minimum
+		if (horizontal_gradient[j] < min) {
+			if (max > 0) { //we have a signature ...
+				min = horizontal_gradient[j];
+				min_index = j;
+				sig = 1;
+			}
+		}
+		if (horizontal_gradient[j] > max) {
+			if (min < 0) {
+				min = 0;
+				max = horizontal_gradient[j];
+				max_index = j;
+				sig = 0;
+			} else {
+				max = horizontal_gradient[j];
+				max_index = j;
+			}
+		}
+	}
+	score = abs(min) + abs(max);
+	width = max_index - min_index;
+	if (score > SCORE_THRESHOLD) {
+		return ((float) (max_index + min_index)) / 2.;
+	}
+	return -1;
+}
+
 float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 	int i, j;
 	(*nb_pts) = 0;
 	int * sampled_lines = (int *) malloc(img.cols * sizeof(int));
 	srand(time(NULL));
-	for (i = 0; i < NB_LINES_SAMPLED; i++) {
-		kernel_horiz(img, sampled_lines, posv_samples_cam[i]);
-		int max = 0, min = 0, max_index = 0, min_index = 0, sig = 0;
-		int score, width;
-		for (j = 1; j < (img.cols - 1); j++) {
-			//Track is white on black, so we expect maximum gradient then minimum
-			if (sampled_lines[j] < min) {
-				if (max > 0) { //we have a signature ...
-					min = sampled_lines[j];
-					min_index = j;
-					sig = 1;
-				}
-			}
-			if (sampled_lines[j] > max) {
-				if (min > 0) {
-					min = 0;
-					max = sampled_lines[j];
-					max_index = j;
-					sig = 0;
-				} else {
-					max = sampled_lines[j];
-					max_index = j;
-				}
-			}
-		}
-		score = abs(min) + abs(max);
-		width = max_index - min_index;
-		if (sig == 1 && score > SCORE_THRESHOLD /*&& width < WIDTH_THRESHOLD*/) {
-			pts[(*nb_pts)].x = ((float) (max_index + min_index)) / 2.;
+	for (i = 0; i < NB_LINES_HORIZ_SAMPLING; i++) {
+		kernel_horiz(img, sampled_lines, posv_samples_cam[i], 0, img.cols);
+		float line_pos = extract_line_pos(sampled_lines, img.cols);
+		if (line_pos >= 0) {
+			pts[(*nb_pts)].x = line_pos;
 			pts[(*nb_pts)].y = posv_samples_cam[i];
 			(*nb_pts)++;
 		}
 	}
-	free(sampled_lines);
+
 	for (i = 0; i < (*nb_pts); i++) {
-		undistort_radial(K, pts[i].x, pts[i].y, &(pts[i].x), &(pts[i].y),radial_undistort, POLY_UNDISTORT_SIZE);
+		undistort_radial(K, pts[i].x, pts[i].y, &(pts[i].x), &(pts[i].y),
+				radial_undistort, POLY_UNDISTORT_SIZE);
 		pixel_to_ground_plane(cam_ct, pts[i].x, pts[i].y, &(pts[i].x),
 				&(pts[i].y));
 	}
 
 	if ((*nb_pts) > ((POLY_LENGTH * 2.0) - 1)) {
-		return fit_line(pts, (*nb_pts), l);
+		float confidence = fit_line(pts, (*nb_pts), l);
+		for (i = NB_LINES_HORIZ_SAMPLING; i < NB_LINES_SAMPLED; i++) {
+			float u, v;
+			float old_l_max_x = l->max_x ;
+			float y = poly_deriv_at(l, (l->max_x - SAMPLE_SPACING_MM),
+					(i * SAMPLE_SPACING_MM));
+			ground_plane_to_pixel(cam_ct, (i * SAMPLE_SPACING_MM), y, &u, &v);
+			kernel_horiz(img, sampled_lines, v, u - 100, u + 100);
+			float line_pos = extract_line_pos(sampled_lines, img.cols);
+			if (line_pos >= 0) {
+				undistort_radial(K, line_pos, v, &(pts[(*nb_pts)].x),
+						&(pts[(*nb_pts)].y), radial_undistort, POLY_UNDISTORT_SIZE);
+				pixel_to_ground_plane(cam_ct, pts[(*nb_pts)].x, pts[(*nb_pts)].y, &(pts[(*nb_pts)].x),
+						&(pts[(*nb_pts)].y));
+				(*nb_pts) ++ ;
+				confidence = fit_line(pts, (*nb_pts), l);
+				/*if(abs(l->max_x - old_l_max_x) < 5.){
+					break ;
+				}*/
+			} else {
+				break;
+			}
+		}
+		free(sampled_lines);
+		return confidence;
 	} else {
+		free(sampled_lines);
 		return 0.;
 	}
+	free(sampled_lines);
+	return 0.;
 //return 0.;
 //TODO : for each detected point, compute its projection in the world frame instead of plain image coordinates
 //
@@ -248,6 +301,7 @@ int detect_line_test(int argc, char ** argv) {
 	for (i = 0; i < nb_pts; i++) {
 		ground_plane_to_pixel(cam_ct, (double) pts[i].x, (double) pts[i].y, &u,
 				&v);
+		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
 		circle(line_image, Point((int) u, (int) v), 4, Scalar(0, 0, 0, 0), 4, 8,
 				0);
 
@@ -261,16 +315,26 @@ int detect_line_test(int argc, char ** argv) {
 			resp += detected.p[i] * pow(x, i);
 		}
 		ground_plane_to_pixel(cam_ct, (double) x, (double) resp, &u, &v);
+		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
 		if (u > line_image.cols || u < 0 || v > line_image.rows || v < 0)
 			break;
-		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 2, 8,
+		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 1, 8,
 				0);
 	}
-	curvature = steering_speed_from_curve(&detected, 150.0,
-							&y_lookahead , &speed_factor);
-	cout << "Curvature " << curvature << endl ;
-	cout << "Speed factor " << speed_factor << endl ;
-	cout << "Y lookahead " << y_lookahead << endl ;
+
+	curvature = steering_speed_from_curve(&detected, 300.0, &y_lookahead,
+			&speed_factor);
+	pixel_to_ground_plane(cam_ct, IMAGE_WIDTH / 2, IMAGE_HEIGHT - 1, &x, &y);
+	cout << x << ", " << y << endl;
+
+	ground_plane_to_pixel(cam_ct, (double) 300, (double) y_lookahead, &u, &v);
+	circle(line_image, Point((int) u, (int) v), 1, Scalar(255, 0, 0, 0), 2, 8,
+			0);
+	cout << "Poly : y" << detected.p[0] << ", " << detected.p[1] << ", "
+			<< detected.p[2] << endl;
+	cout << "Curvature " << curvature << endl;
+	cout << "Speed factor " << speed_factor << endl;
+	cout << "Y lookahead " << y_lookahead << endl;
 	imshow("orig", line_image);
 	imshow("map", map_image);
 	waitKey(0);
