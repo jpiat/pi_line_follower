@@ -27,8 +27,8 @@ double bot_pos_in_world[4];
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
 #define NB_LINES_HORIZ_SAMPLING 8
-#define NB_LINES_SAMPLED 32
-#define SAMPLE_SPACING_MM 25.0
+#define NB_LINES_SAMPLED 24
+#define SAMPLE_SPACING_MM 28.0
 
 float posx_samples_world[NB_LINES_SAMPLED];
 unsigned int posv_samples_cam[NB_LINES_SAMPLED];
@@ -84,7 +84,7 @@ void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
 	}
 }
 
-#define NB_LOOP_DISTANCE 5
+#define NB_LOOP_DISTANCE 4
 float distance_to_curve(curve * l, float x, float y) {
 	float resp_1 = 0., resp_2 = 0.;
 	float current_x = x, current_x_1, current_x_2;
@@ -98,15 +98,14 @@ float distance_to_curve(curve * l, float x, float y) {
 		resp_2 = poly_at(l, current_x_2);
 		error_1 = sqrt(pow(current_x_1 - x, 2) + pow(resp_1 - y, 2));
 		error_2 = sqrt(pow(current_x_2 - x, 2) + pow(resp_2 - y, 2));
-		if(error_1 < error_2 && error_1 < last_error) {
+		if (error_1 < error_2 && error_1 < last_error) {
 			current_x = current_x_1;
 			last_error = error_1;
-		} else if(error_2 <= error_1 && error_2 < last_error) {
+		} else if (error_2 <= error_1 && error_2 < last_error) {
 			current_x = current_x_2;
 			last_error = error_2;
-		}
-		else{
-			increment = increment /2.;
+		} else {
+			increment = increment / 2.;
 		}
 	}
 	return last_error;
@@ -114,7 +113,7 @@ float distance_to_curve(curve * l, float x, float y) {
 
 #define RANSAC_LIST (POLY_LENGTH)
 #define RANSAC_NB_LOOPS NB_LINES_SAMPLED
-#define RANSAC_INLIER_LIMIT 4.0
+#define RANSAC_INLIER_LIMIT 5.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i;
 //Should move dynamic memory allocation to static
@@ -192,8 +191,8 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 
 #define SCORE_THRESHOLD 100
 #define WIDTH_THRESHOLD 100
-void extract_line_pos(int * horizontal_gradient, unsigned int line_size,
-		float * line, int * nb_lines) {
+void extract_line_pos(int * horizontal_gradient, unsigned int line_start,
+		unsigned int line_stop, float * line, int * nb_lines) {
 	int j;
 	int max = 0, min = 0, max_index = 0, min_index = 0;
 	int scores[8]; //would need to be dynamically allocated
@@ -201,7 +200,7 @@ void extract_line_pos(int * horizontal_gradient, unsigned int line_size,
 	int max_nb_lines = (*nb_lines);
 	int new_detected = 0;
 	(*nb_lines) = 0;
-	for (j = 1; j < line_size; j++) {
+	for (j = line_start; j < line_stop; j++) {
 		//Track is white on black, so we expect maximum gradient then minimum
 		if (horizontal_gradient[j] < min) {
 			if (max > 0) { //we have a signature ...
@@ -241,7 +240,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 		kernel_horiz(img, sampled_lines, posv_samples_cam[i], 0, img.cols);
 		float line_pos;
 		int nb_lines = 1;
-		extract_line_pos(sampled_lines, img.cols, &line_pos, &nb_lines);
+		extract_line_pos(sampled_lines, 1, (img.cols), &line_pos, &nb_lines);
 		if (nb_lines > 0) {
 			pts[(*nb_pts)].x = line_pos;
 			pts[(*nb_pts)].y = posv_samples_cam[i];
@@ -269,7 +268,8 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 			kernel_horiz(img, sampled_lines, v, u - 50, u + 50);
 			float line_pos;
 			int nb_lines = 1;
-			extract_line_pos(sampled_lines, img.cols, &line_pos, &nb_lines);
+			extract_line_pos(sampled_lines, u - 50, u + 50, &line_pos,
+					&nb_lines);
 			if (nb_lines > 0) {
 				undistort_radial(K, line_pos, v, &(pts[(*nb_pts)].x),
 						&(pts[(*nb_pts)].y), radial_undistort,
