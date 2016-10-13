@@ -12,7 +12,7 @@ using namespace cv;
 
 #ifndef DETECT_LINE_H
 #define DETECT_LINE_H
-#define POLY_LENGTH 3
+#define POLY_LENGTH 4
 typedef struct curve {
 	float p[POLY_LENGTH];
 	float max_x;

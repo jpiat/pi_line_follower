@@ -26,17 +26,42 @@ double bot_pos_in_world[4];
 
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
-#define NB_LINES_HORIZ_SAMPLING 16
-#define NB_LINES_SAMPLED 42
-#define SAMPLE_SPACING_MM 20.0
+#define NB_LINES_HORIZ_SAMPLING 8
+#define NB_LINES_SAMPLED 32
+#define SAMPLE_SPACING_MM 25.0
 
 float posx_samples_world[NB_LINES_SAMPLED];
 unsigned int posv_samples_cam[NB_LINES_SAMPLED];
+
+float * x;
+float * y;
+char * used;
+unsigned char * inliers;
+unsigned char * max_inliers;
 
 float rand_a_b(int a, int b) {
 	//return ((rand() % (b - a) + a;
 	float rand_0_1 = (((float) rand()) / ((float) RAND_MAX));
 	return (rand_0_1 * (b - a)) + a;
+}
+
+float poly_at(curve * c, float x) {
+	int i;
+	float resp = 0.;
+	for (i = 0; i < POLY_LENGTH; i++) {
+		resp += c->p[i] * pow(x, i);
+	}
+	return resp;
+}
+
+float poly_deriv_at(curve * c, float derivx, float x) {
+	int i;
+	float resp = 0.;
+	for (i = 1; i < POLY_LENGTH; i++) {
+		resp += c->p[i] * pow(derivx, (i - 1));
+	}
+	resp = (resp * (x - derivx)) + poly_at(c, derivx);
+	return resp;
 }
 
 void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
@@ -59,35 +84,47 @@ void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
 	}
 }
 
+#define NB_LOOP_DISTANCE 5
 float distance_to_curve(curve * l, float x, float y) {
-	float resp = 0.;
-	int j;
-	for (j = 0; j < POLY_LENGTH; j++) {
-		resp += l->p[j] * pow(x, j);
+	float resp_1 = 0., resp_2 = 0.;
+	float current_x = x, current_x_1, current_x_2;
+	int j, i;
+	float error_1 = 0, error_2 = 0, last_error = 320000.;
+	float increment = 1.;
+	for (i = 0; i < NB_LOOP_DISTANCE; i++) {
+		float current_x_1 = current_x - increment, current_x_2 = current_x
+				+ increment;
+		resp_1 = poly_at(l, current_x_1);
+		resp_2 = poly_at(l, current_x_2);
+		error_1 = sqrt(pow(current_x_1 - x, 2) + pow(resp_1 - y, 2));
+		error_2 = sqrt(pow(current_x_2 - x, 2) + pow(resp_2 - y, 2));
+		if(error_1 < error_2 && error_1 < last_error) {
+			current_x = current_x_1;
+			last_error = error_1;
+		} else if(error_2 <= error_1 && error_2 < last_error) {
+			current_x = current_x_2;
+			last_error = error_2;
+		}
+		else{
+			increment = increment /2.;
+		}
 	}
-	float error = abs(resp - y);
-	return error;
+	return last_error;
 }
 
 #define RANSAC_LIST (POLY_LENGTH)
 #define RANSAC_NB_LOOPS NB_LINES_SAMPLED
-#define RANSAC_INLIER_LIMIT 2.0
+#define RANSAC_INLIER_LIMIT 4.0
 float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int i;
-	//Should move dynamic memory allocation to static
-	float * x = (float *) malloc(nb_pts * sizeof(float));
-	float * y = (float *) malloc(nb_pts * sizeof(float));
-	char * used = (char *) malloc(nb_pts * sizeof(char));
-	unsigned char * inliers = (unsigned char *) malloc(nb_pts * sizeof(char));
-	unsigned char * max_inliers = (unsigned char *) malloc(
-			nb_pts * sizeof(char));
+//Should move dynamic memory allocation to static
 	int max_consensus = 0;
 	for (i = 0; i < RANSAC_NB_LOOPS; i++) {
 		int pt_index = 0;
 		int nb_consensus = 0;
 		unsigned int idx = 0;
 		float max_x_temp = 0;
-		float min_x_temp = 3000.; //arbitrary ...
+		float min_x_temp = 300000.; //arbitrary ...
 		memset(used, 0, nb_pts * sizeof(char)); //zero used index
 		while (pt_index < RANSAC_LIST) {
 			idx = rand_a_b(0, (nb_pts - 1));
@@ -133,57 +170,50 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 
 	for (i = 0; i < max_consensus; i++) {
 		int idx = max_inliers[i];
-		y[i] = pts[idx].y;
-		x[i] = pts[idx].x;
+		if (idx < 0 || idx > NB_LINES_SAMPLED) {
+			cout << "idx error" << endl;
+		} else {
+			y[i] = pts[idx].y;
+			x[i] = pts[idx].x;
+		}
 	}
-	//Should recompute the curve interpolation with inliers
+//Should recompute the curve interpolation with inliers
 	compute_interpolation(x, y, l->p, POLY_LENGTH, max_consensus);
-	free(x);
-	free(y);
-	free(used);
-	free(inliers);
-	free(max_inliers);
-	//printf("Max consensus %d \n", max_consensus);
+
+//printf("Max consensus %d \n", max_consensus);
 	/*
 	 printf("%f + %f*x + %f*x^2 \n", l->p[0], l->p[1], l->p[2]);
 	 */
 	float confidence = ((float) (max_consensus)) / ((float) nb_pts);
-	//printf("Confidence %f \n", confidence);
+//printf("Confidence %f \n", confidence);
 
 	return confidence;
 }
-float poly_at(curve * c, float x) {
-	int i;
-	float resp = 0.;
-	for (i = 0; i < POLY_LENGTH; i++) {
-		resp += c->p[i] * pow(x, i);
-	}
-	return resp;
-}
 
-float poly_deriv_at(curve * c, float derivx, float x) {
-	int i;
-	float resp = 0.;
-	for (i = 1; i < POLY_LENGTH; i++) {
-		resp += c->p[i] * pow(derivx, (i - 1));
-	}
-	resp = (resp * (x - derivx)) + poly_at(c, derivx);
-	return resp;
-}
-
-#define SCORE_THRESHOLD 200
+#define SCORE_THRESHOLD 100
 #define WIDTH_THRESHOLD 100
-float extract_line_pos(int * horizontal_gradient, unsigned int line_size) {
+void extract_line_pos(int * horizontal_gradient, unsigned int line_size,
+		float * line, int * nb_lines) {
 	int j;
-	int max = 0, min = 0, max_index = 0, min_index = 0, sig = 0;
-	int score, width;
+	int max = 0, min = 0, max_index = 0, min_index = 0;
+	int scores[8]; //would need to be dynamically allocated
+	memset(scores, 0, 8 * sizeof(int));
+	int max_nb_lines = (*nb_lines);
+	int new_detected = 0;
+	(*nb_lines) = 0;
 	for (j = 1; j < line_size; j++) {
 		//Track is white on black, so we expect maximum gradient then minimum
 		if (horizontal_gradient[j] < min) {
 			if (max > 0) { //we have a signature ...
 				min = horizontal_gradient[j];
 				min_index = j;
-				sig = 1;
+				scores[(*nb_lines)] = abs(min) + abs(max);
+				if (scores[(*nb_lines)] > SCORE_THRESHOLD) {
+					(*line) = ((float) (max_index + min_index)) / 2.;
+					if (new_detected == 0)
+						(*nb_lines)++; //first time the line is discovered
+				}
+				new_detected = 1;
 			}
 		}
 		if (horizontal_gradient[j] > max) {
@@ -191,30 +221,28 @@ float extract_line_pos(int * horizontal_gradient, unsigned int line_size) {
 				min = 0;
 				max = horizontal_gradient[j];
 				max_index = j;
-				sig = 0;
+				new_detected = 0;
+				//start of a new line ...
 			} else {
 				max = horizontal_gradient[j];
 				max_index = j;
 			}
 		}
 	}
-	score = abs(min) + abs(max);
-	width = max_index - min_index;
-	if (score > SCORE_THRESHOLD) {
-		return ((float) (max_index + min_index)) / 2.;
-	}
-	return -1;
+
 }
 
 float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
-	int i, j;
+	int i;
 	(*nb_pts) = 0;
 	int * sampled_lines = (int *) malloc(img.cols * sizeof(int));
 	srand(time(NULL));
 	for (i = 0; i < NB_LINES_HORIZ_SAMPLING; i++) {
 		kernel_horiz(img, sampled_lines, posv_samples_cam[i], 0, img.cols);
-		float line_pos = extract_line_pos(sampled_lines, img.cols);
-		if (line_pos >= 0) {
+		float line_pos;
+		int nb_lines = 1;
+		extract_line_pos(sampled_lines, img.cols, &line_pos, &nb_lines);
+		if (nb_lines > 0) {
 			pts[(*nb_pts)].x = line_pos;
 			pts[(*nb_pts)].y = posv_samples_cam[i];
 			(*nb_pts)++;
@@ -232,22 +260,25 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 		float confidence = fit_line(pts, (*nb_pts), l);
 		for (i = NB_LINES_HORIZ_SAMPLING; i < NB_LINES_SAMPLED; i++) {
 			float u, v;
-			float old_l_max_x = l->max_x ;
+			float old_l_max_x = l->max_x;
 			float y = poly_deriv_at(l, (l->max_x - SAMPLE_SPACING_MM),
 					(i * SAMPLE_SPACING_MM));
 			ground_plane_to_pixel(cam_ct, (i * SAMPLE_SPACING_MM), y, &u, &v);
-			kernel_horiz(img, sampled_lines, v, u - 100, u + 100);
-			float line_pos = extract_line_pos(sampled_lines, img.cols);
-			if (line_pos >= 0) {
+			if (u < 0 || u >= img.cols || v < 0 || v >= img.rows)
+				break;
+			kernel_horiz(img, sampled_lines, v, u - 50, u + 50);
+			float line_pos;
+			int nb_lines = 1;
+			extract_line_pos(sampled_lines, img.cols, &line_pos, &nb_lines);
+			if (nb_lines > 0) {
 				undistort_radial(K, line_pos, v, &(pts[(*nb_pts)].x),
-						&(pts[(*nb_pts)].y), radial_undistort, POLY_UNDISTORT_SIZE);
-				pixel_to_ground_plane(cam_ct, pts[(*nb_pts)].x, pts[(*nb_pts)].y, &(pts[(*nb_pts)].x),
+						&(pts[(*nb_pts)].y), radial_undistort,
+						POLY_UNDISTORT_SIZE);
+				pixel_to_ground_plane(cam_ct, pts[(*nb_pts)].x,
+						pts[(*nb_pts)].y, &(pts[(*nb_pts)].x),
 						&(pts[(*nb_pts)].y));
-				(*nb_pts) ++ ;
+				(*nb_pts)++;
 				confidence = fit_line(pts, (*nb_pts), l);
-				/*if(abs(l->max_x - old_l_max_x) < 5.){
-					break ;
-				}*/
 			} else {
 				break;
 			}
@@ -268,14 +299,30 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
 
 void init_line_detector() {
 	int i;
-	float x, y, u, v;
+	float u, v;
 	calc_ct(camera_pose, K, cam_to_bot_in_world, cam_ct); //compute projection matrix from camera coordinates to world coordinates
-	//Sampling world frame and projecting into camera frame
+//Sampling world frame and projecting into camera frame
 	for (i = 0; i < NB_LINES_SAMPLED; i++) {
 		posx_samples_world[i] = (i + 1) * SAMPLE_SPACING_MM;
 		ground_plane_to_pixel(cam_ct, posx_samples_world[i], 0, &u, &v);
+		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
 		posv_samples_cam[i] = v;
 	}
+	x = (float *) malloc(NB_LINES_SAMPLED * sizeof(float));
+	y = (float *) malloc(NB_LINES_SAMPLED * sizeof(float));
+	used = (char *) malloc(NB_LINES_SAMPLED * sizeof(char));
+	inliers = (unsigned char *) malloc(
+	NB_LINES_SAMPLED * sizeof(char));
+	max_inliers = (unsigned char *) malloc(
+	NB_LINES_SAMPLED * sizeof(char));
+}
+
+void close_line_detector() {
+	free(x);
+	free(y);
+	free(used);
+	free(inliers);
+	free(max_inliers);
 }
 
 int detect_line_test(int argc, char ** argv) {
@@ -291,7 +338,7 @@ int detect_line_test(int argc, char ** argv) {
 	init_line_detector();
 	Mat line_image;
 	line_image = imread(argv[1], IMREAD_GRAYSCALE);
-	Mat map_image(320, 320,
+	Mat map_image(480, 480,
 	CV_8UC1, Scalar(255));
 	tic
 	;
@@ -302,14 +349,14 @@ int detect_line_test(int argc, char ** argv) {
 		ground_plane_to_pixel(cam_ct, (double) pts[i].x, (double) pts[i].y, &u,
 				&v);
 		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
-		circle(line_image, Point((int) u, (int) v), 4, Scalar(0, 0, 0, 0), 4, 8,
+		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 4, 8,
 				0);
 
 		circle(map_image, Point(pts[i].x, (pts[i].y + map_image.cols / 2)), 1,
 				Scalar(0, 0, 0, 0), 4, 8, 0);
 	}
 
-	for (x = detected.min_x;; x += 0.1) {
+	for (x = detected.min_x; x <= detected.max_x; x += 0.1) {
 		float resp = 0.;
 		for (i = 0; i < POLY_LENGTH; i++) {
 			resp += detected.p[i] * pow(x, i);

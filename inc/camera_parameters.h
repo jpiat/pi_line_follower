@@ -6,7 +6,8 @@
 
 
 //all the following is computed with matlab calibration toolbox ...
-extern double radial_distort[2];
+#define POLY_DISTORT_SIZE 2
+extern double radial_distort[POLY_DISTORT_SIZE];
 #define POLY_UNDISTORT_SIZE 3
 extern double radial_undistort[POLY_UNDISTORT_SIZE];
 
