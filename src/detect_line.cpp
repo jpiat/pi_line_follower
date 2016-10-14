@@ -97,8 +97,12 @@ inline float distance_to_curve(curve * l, float x, float y) {
 				+ increment;
 		resp_1 = poly_at(l, current_x_1);
 		resp_2 = poly_at(l, current_x_2);
-		error_1 = sqrt(((current_x_1 - x)*(current_x_1 - x)) + ((resp_1 - y)*(resp_1 - y)));
-		error_2 = sqrt(((current_x_2 - x)*(current_x_2 - x)) + ((resp_2 - y)*(resp_2 - y)));
+		error_1 = sqrt(
+				((current_x_1 - x) * (current_x_1 - x))
+						+ ((resp_1 - y) * (resp_1 - y)));
+		error_2 = sqrt(
+				((current_x_2 - x) * (current_x_2 - x))
+						+ ((resp_2 - y) * (resp_2 - y)));
 		if (error_1 < error_2 && error_1 < last_error) {
 			current_x = current_x_1;
 			last_error = error_1;
@@ -252,12 +256,13 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
 		initial_search_stop_u = (u >= 0) ? round(u) : 0;
 
-		if(initial_search_stop_u < initial_search_start_u){
-			unsigned int temp = initial_search_stop_u ;
-			initial_search_stop_u = initial_search_start_u ;
-			initial_search_start_u = temp ;
+		if (initial_search_stop_u < initial_search_start_u) {
+			unsigned int temp = initial_search_stop_u;
+			initial_search_stop_u = initial_search_start_u;
+			initial_search_start_u = temp;
 		}
-		if(initial_search_stop_u >= img.cols) initial_search_stop_u = img.cols ;
+		if (initial_search_stop_u >= img.cols)
+			initial_search_stop_u = img.cols;
 		//compute curve position at first sample
 		//limit search space {initial_search_start_u, initial_search_stop_u}
 	}
@@ -266,7 +271,8 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 				initial_search_start_u, initial_search_stop_u);
 		float line_pos;
 		int nb_lines = 1;
-		extract_line_pos(sampled_lines, initial_search_start_u, initial_search_stop_u, &line_pos, &nb_lines);
+		extract_line_pos(sampled_lines, initial_search_start_u,
+				initial_search_stop_u, &line_pos, &nb_lines);
 		if (nb_lines > 0) {
 			pts[(*nb_pts)].x = line_pos;
 			pts[(*nb_pts)].y = posv_samples_cam[i];
@@ -353,6 +359,7 @@ void close_line_detector() {
 
 int detect_line_test(int argc, char ** argv) {
 	int i, nb_pts;
+	int image_index = 0 ;
 	float x, y, u, v, y_lookahead, speed_factor, curvature;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
@@ -360,59 +367,67 @@ int detect_line_test(int argc, char ** argv) {
 		printf("Requires image path \n");
 		exit(-1);
 	}
-
+	char * image_path = (char *) malloc(256); //
 	init_line_detector();
-	Mat line_image;
-	line_image = imread(argv[1], IMREAD_GRAYSCALE);
-	Mat map_image(480, 480,
-	CV_8UC1, Scalar(255));
-	tic
-	;
-	//for (i = 0; i < 1000; i++) {
+	while (1) {
+		Mat line_image;
+		sprintf(image_path, argv[1], image_index);
+		line_image = imread(image_path, IMREAD_GRAYSCALE);
+		if(line_image.data == NULL) break ;
+		Mat map_image(480, 480,
+		CV_8UC1, Scalar(255));
+		Mat view_img(line_image.cols, line_image.rows, CV_8UC3);
+		cvtColor(line_image, view_img, CV_GRAY2RGB);
+		tic
+		;
+		//for (i = 0; i < 1000; i++) {
 		detect_line(line_image, &detected, pts, &nb_pts, 0);
-		detect_line(line_image, &detected, pts, &nb_pts, 1); //now track
-	//}
-	toc
-	;
-	for (i = 0; i < nb_pts; i++) {
-		ground_plane_to_pixel(cam_ct, (double) pts[i].x, (double) pts[i].y, &u,
-				&v);
-		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
-		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 4, 8,
-				0);
+//		detect_line(line_image, &detected, pts, &nb_pts, 1); //now track
+		//}
+		toc
+		;
+		for (i = 0; i < nb_pts; i++) {
+			ground_plane_to_pixel(cam_ct, (double) pts[i].x, (double) pts[i].y,
+					&u, &v);
+			distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
+			circle(view_img, Point((int) u, (int) v), 1, Scalar(0, 0, 255, 0),
+					4, 8, 0);
 
-		circle(map_image, Point(pts[i].x, (pts[i].y + map_image.cols / 2)), 1,
-				Scalar(0, 0, 0, 0), 4, 8, 0);
-	}
-
-	for (x = 0.; /*x <= detected.max_x*/; x += 0.1) {
-		float resp = 0.;
-		for (i = 0; i < POLY_LENGTH; i++) {
-			resp += detected.p[i] * pow(x, i);
+			circle(map_image, Point(pts[i].x, (pts[i].y + map_image.cols / 2)),
+					1, Scalar(0, 0, 0, 0), 4, 8, 0);
 		}
-		ground_plane_to_pixel(cam_ct, (double) x, (double) resp, &u, &v);
-		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
-		if (u > line_image.cols || u < 0 || v > line_image.rows || v < 0)
-			break;
-		circle(line_image, Point((int) u, (int) v), 1, Scalar(0, 0, 0, 0), 1, 8,
-				0);
+
+		for (x = detected.min_x; x <= detected.max_x ; x += 0.1) {
+			float resp = 0.;
+			for (i = 0; i < POLY_LENGTH; i++) {
+				resp += detected.p[i] * pow(x, i);
+			}
+			ground_plane_to_pixel(cam_ct, (double) x, (double) resp, &u, &v);
+			distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
+			if (u > line_image.cols || u < 0 || v > line_image.rows || v < 0)
+				break;
+			circle(view_img, Point((int) u, (int) v), 1, Scalar(0, 255, 0, 0),
+					1, 8, 0);
+		}
+
+		curvature = steering_speed_from_curve(&detected, 300.0, &y_lookahead,
+				&speed_factor);
+		pixel_to_ground_plane(cam_ct, IMAGE_WIDTH / 2, IMAGE_HEIGHT - 1, &x,
+				&y);
+		cout << x << ", " << y << endl;
+
+		ground_plane_to_pixel(cam_ct, (double) 300, (double) y_lookahead, &u,
+				&v);
+		circle(line_image, Point((int) u, (int) v), 1, Scalar(255, 0, 0, 0), 2,
+				8, 0);
+		cout << "Poly : y" << detected.p[0] << ", " << detected.p[1] << ", "
+				<< detected.p[2] << endl;
+		cout << "Curvature " << curvature << endl;
+		cout << "Speed factor " << speed_factor << endl;
+		cout << "Y lookahead " << y_lookahead << endl;
+		imshow("orig", view_img);
+		imshow("map", map_image);
+		waitKey(0);
+		image_index ++ ;
 	}
-
-	curvature = steering_speed_from_curve(&detected, 300.0, &y_lookahead,
-			&speed_factor);
-	pixel_to_ground_plane(cam_ct, IMAGE_WIDTH / 2, IMAGE_HEIGHT - 1, &x, &y);
-	cout << x << ", " << y << endl;
-
-	ground_plane_to_pixel(cam_ct, (double) 300, (double) y_lookahead, &u, &v);
-	circle(line_image, Point((int) u, (int) v), 1, Scalar(255, 0, 0, 0), 2, 8,
-			0);
-	cout << "Poly : y" << detected.p[0] << ", " << detected.p[1] << ", "
-			<< detected.p[2] << endl;
-	cout << "Curvature " << curvature << endl;
-	cout << "Speed factor " << speed_factor << endl;
-	cout << "Y lookahead " << y_lookahead << endl;
-	imshow("orig", line_image);
-	imshow("map", map_image);
-	waitKey(0);
-	return 0;
 }
