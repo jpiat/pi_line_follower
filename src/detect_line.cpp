@@ -97,9 +97,8 @@ inline float distance_to_curve(curve * l, float x, float y) {
 				+ increment;
 		resp_1 = poly_at(l, current_x_1);
 		resp_2 = poly_at(l, current_x_2);
-		error_1 = sqrt(pow(current_x_1 - x, 2) + pow(resp_1 - y, 2));
-		error_2 = sqrt(pow(current_x_2 - x, 2) + pow(resp_2 - y, 2));
-
+		error_1 = sqrt(((current_x_1 - x)*(current_x_1 - x)) + ((resp_1 - y)*(resp_1 - y)));
+		error_2 = sqrt(((current_x_2 - x)*(current_x_2 - x)) + ((resp_2 - y)*(resp_2 - y)));
 		if (error_1 < error_2 && error_1 < last_error) {
 			current_x = current_x_1;
 			last_error = error_1;
@@ -242,14 +241,23 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 	unsigned int initial_search_stop_u = img.cols;
 	if (track == 1) {
 		//TODO: take curve equation
-		double x = ((i + 1) * SAMPLE_SPACING_MM);
+		double x = (SAMPLE_SPACING_MM);
 		double y = poly_at(l, x);
 		float u, v;
-		double y_1 = y - img.cols / 4, y_2 = y + img.cols / 4;
+		double y_1 = y - 150., y_2 = y + 150.;
 		ground_plane_to_pixel(cam_ct, x, y_1, &u, &v);
-		initial_search_start_u = round(u);
+		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
+		initial_search_start_u = (u >= 0) ? round(u) : 0;
 		ground_plane_to_pixel(cam_ct, x, y_2, &u, &v);
-		initial_search_stop_u = round(u);
+		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
+		initial_search_stop_u = (u >= 0) ? round(u) : 0;
+
+		if(initial_search_stop_u < initial_search_start_u){
+			unsigned int temp = initial_search_stop_u ;
+			initial_search_stop_u = initial_search_start_u ;
+			initial_search_start_u = temp ;
+		}
+		if(initial_search_stop_u >= img.cols) initial_search_stop_u = img.cols ;
 		//compute curve position at first sample
 		//limit search space {initial_search_start_u, initial_search_stop_u}
 	}
@@ -258,7 +266,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 				initial_search_start_u, initial_search_stop_u);
 		float line_pos;
 		int nb_lines = 1;
-		extract_line_pos(sampled_lines, 1, (img.cols), &line_pos, &nb_lines);
+		extract_line_pos(sampled_lines, initial_search_start_u, initial_search_stop_u, &line_pos, &nb_lines);
 		if (nb_lines > 0) {
 			pts[(*nb_pts)].x = line_pos;
 			pts[(*nb_pts)].y = posv_samples_cam[i];
@@ -360,10 +368,10 @@ int detect_line_test(int argc, char ** argv) {
 	CV_8UC1, Scalar(255));
 	tic
 	;
-	for (i = 0; i < 1000; i++) {
+	//for (i = 0; i < 1000; i++) {
 		detect_line(line_image, &detected, pts, &nb_pts, 0);
 		detect_line(line_image, &detected, pts, &nb_pts, 1); //now track
-	}
+	//}
 	toc
 	;
 	for (i = 0; i < nb_pts; i++) {
@@ -377,7 +385,7 @@ int detect_line_test(int argc, char ** argv) {
 				Scalar(0, 0, 0, 0), 4, 8, 0);
 	}
 
-	for (x = detected.min_x; x <= detected.max_x; x += 0.1) {
+	for (x = 0.; /*x <= detected.max_x*/; x += 0.1) {
 		float resp = 0.;
 		for (i = 0; i < POLY_LENGTH; i++) {
 			resp += detected.p[i] * pow(x, i);
