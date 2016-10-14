@@ -27,8 +27,8 @@ double bot_pos_in_world[4];
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
 #define NB_LINES_HORIZ_SAMPLING 8
-#define NB_LINES_SAMPLED 24
-#define SAMPLE_SPACING_MM 28.0
+#define NB_LINES_SAMPLED 28
+#define SAMPLE_SPACING_MM 30.0
 
 float posx_samples_world[NB_LINES_SAMPLED];
 unsigned int posv_samples_cam[NB_LINES_SAMPLED];
@@ -84,11 +84,12 @@ void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
 	}
 }
 
+//This is the most time consuming function for now
 #define NB_LOOP_DISTANCE 4
-float distance_to_curve(curve * l, float x, float y) {
+inline float distance_to_curve(curve * l, float x, float y) {
 	float resp_1 = 0., resp_2 = 0.;
 	float current_x = x, current_x_1, current_x_2;
-	int j, i;
+	int i;
 	float error_1 = 0, error_2 = 0, last_error = 320000.;
 	float increment = 1.;
 	for (i = 0; i < NB_LOOP_DISTANCE; i++) {
@@ -98,6 +99,7 @@ float distance_to_curve(curve * l, float x, float y) {
 		resp_2 = poly_at(l, current_x_2);
 		error_1 = sqrt(pow(current_x_1 - x, 2) + pow(resp_1 - y, 2));
 		error_2 = sqrt(pow(current_x_2 - x, 2) + pow(resp_2 - y, 2));
+
 		if (error_1 < error_2 && error_1 < last_error) {
 			current_x = current_x_1;
 			last_error = error_1;
@@ -231,13 +233,29 @@ void extract_line_pos(int * horizontal_gradient, unsigned int line_start,
 
 }
 
-float detect_line(Mat & img, curve * l, point * pts, int * nb_pts) {
+float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 	int i;
 	(*nb_pts) = 0;
 	int * sampled_lines = (int *) malloc(img.cols * sizeof(int));
 	srand(time(NULL));
+	unsigned int initial_search_start_u = 0;
+	unsigned int initial_search_stop_u = img.cols;
+	if (track == 1) {
+		//TODO: take curve equation
+		double x = ((i + 1) * SAMPLE_SPACING_MM);
+		double y = poly_at(l, x);
+		float u, v;
+		double y_1 = y - img.cols / 4, y_2 = y + img.cols / 4;
+		ground_plane_to_pixel(cam_ct, x, y_1, &u, &v);
+		initial_search_start_u = round(u);
+		ground_plane_to_pixel(cam_ct, x, y_2, &u, &v);
+		initial_search_stop_u = round(u);
+		//compute curve position at first sample
+		//limit search space {initial_search_start_u, initial_search_stop_u}
+	}
 	for (i = 0; i < NB_LINES_HORIZ_SAMPLING; i++) {
-		kernel_horiz(img, sampled_lines, posv_samples_cam[i], 0, img.cols);
+		kernel_horiz(img, sampled_lines, posv_samples_cam[i],
+				initial_search_start_u, initial_search_stop_u);
 		float line_pos;
 		int nb_lines = 1;
 		extract_line_pos(sampled_lines, 1, (img.cols), &line_pos, &nb_lines);
@@ -342,7 +360,10 @@ int detect_line_test(int argc, char ** argv) {
 	CV_8UC1, Scalar(255));
 	tic
 	;
-	detect_line(line_image, &detected, pts, &nb_pts);
+	for (i = 0; i < 1000; i++) {
+		detect_line(line_image, &detected, pts, &nb_pts, 0);
+		detect_line(line_image, &detected, pts, &nb_pts, 1); //now track
+	}
 	toc
 	;
 	for (i = 0; i < nb_pts; i++) {
