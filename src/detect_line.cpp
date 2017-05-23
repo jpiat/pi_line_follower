@@ -27,7 +27,7 @@ double bot_pos_in_world[4];
 char line_detection_kernel[9] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
 
 #define NB_LINES_HORIZ_SAMPLING 8
-#define NB_LINES_SAMPLED 28
+#define NB_LINES_SAMPLED 42
 #define SAMPLE_SPACING_MM 30.0
 
 float posx_samples_world[NB_LINES_SAMPLED];
@@ -66,10 +66,12 @@ float poly_deriv_at(curve * c, float derivx, float x) {
 
 void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
 		unsigned int u_start, unsigned int u_end) {
-	int i;
+	unsigned int i;
 	memset(kernel_response, 0, sizeof(int) * img.cols);
 	unsigned char * upixel_ptr = (unsigned char *) img.data;
-	for (i = u_start; i < u_end && i < img.cols; i++) {
+	if (u_start == 0)
+		u_start = 1;
+	for (i = u_start; i < u_end && i < ((unsigned int) (img.cols - 1)); i++) {
 		int response_x = 0;
 		response_x -= upixel_ptr[(v - 1) * img.step + (i - 1)];
 		response_x -= 2 * upixel_ptr[(v) * img.step + (i - 1)];
@@ -85,10 +87,10 @@ void kernel_horiz(Mat & img, int * kernel_response, unsigned int v,
 }
 
 //This is the most time consuming function for now
-#define NB_LOOP_DISTANCE 4
+#define NB_LOOP_DISTANCE 6
 inline float distance_to_curve(curve * l, float x, float y) {
 	float resp_1 = 0., resp_2 = 0.;
-	float current_x = x, current_x_1, current_x_2;
+	float current_x = x;
 	int i;
 	float error_1 = 0, error_2 = 0, last_error = 320000.;
 	float increment = 1.;
@@ -125,15 +127,21 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 	int max_consensus = 0;
 	for (i = 0; i < RANSAC_NB_LOOPS; i++) {
 		int pt_index = 0;
+		int max_search_used = 0;
 		int nb_consensus = 0;
 		unsigned int idx = 0;
 		float max_x_temp = 0;
-		float min_x_temp = 300000.; //arbitrary ...
+		float min_x_temp = FLT_MAX; //arbitrary ...
 		memset(used, 0, nb_pts * sizeof(char)); //zero used index
 		while (pt_index < RANSAC_LIST) {
 			idx = rand_a_b(0, (nb_pts - 1));
-			while (used[idx] != 0)
+			max_search_used = 0;
+			while (used[idx] != 0 && max_search_used < NB_LINES_SAMPLED) {
 				idx = (idx + 1) % NB_LINES_SAMPLED;
+				max_search_used++;
+			}
+			if (max_search_used >= NB_LINES_SAMPLED)
+				break;
 			y[pt_index] = pts[idx].y;
 			x[pt_index] = pts[idx].x;
 			if (x[pt_index] > max_x_temp)
@@ -196,13 +204,13 @@ float fit_line(point * pts, unsigned int nb_pts, curve * l) {
 
 #define SCORE_THRESHOLD 100
 #define WIDTH_THRESHOLD 100
-void extract_line_pos(int * horizontal_gradient, unsigned int line_start,
+void extract_wide_line_pos(int * horizontal_gradient, unsigned int line_start,
 		unsigned int line_stop, float * line, int * nb_lines) {
-	int j;
+	unsigned int j;
 	int max = 0, min = 0, max_index = 0, min_index = 0;
-	int scores[8]; //would need to be dynamically allocated
+	int * scores = (int *) malloc(8 * sizeof(int)); //would need to be dynamically allocated
 	memset(scores, 0, 8 * sizeof(int));
-	int max_nb_lines = (*nb_lines);
+	//int max_nb_lines = (*nb_lines);
 	int new_detected = 0;
 	(*nb_lines) = 0;
 	for (j = line_start; j < line_stop; j++) {
@@ -213,7 +221,7 @@ void extract_line_pos(int * horizontal_gradient, unsigned int line_start,
 				min_index = j;
 				scores[(*nb_lines)] = abs(min) + abs(max);
 				if (scores[(*nb_lines)] > SCORE_THRESHOLD) {
-					(*line) = ((float) (max_index + min_index)) / 2.;
+					(*line) = ((float) (max_index + min_index)) / 2.; // line pos is the middle of hills
 					if (new_detected == 0)
 						(*nb_lines)++; //first time the line is discovered
 				}
@@ -233,7 +241,119 @@ void extract_line_pos(int * horizontal_gradient, unsigned int line_start,
 			}
 		}
 	}
+	free(scores);
+}
 
+void extract_thin_line_pos(int * horizontal_gradient, unsigned int line_start,
+		unsigned int line_stop, float * line, int * nb_lines, int dir) {
+	unsigned int j;
+	int max = 0, min = 0;
+	(*nb_lines) = 0;
+	for (j = line_start; j < line_stop; j++) {
+		if (horizontal_gradient[j] < min && dir == -1) {
+			(*line) = j;
+			min = horizontal_gradient[j];
+			(*nb_lines) = 1;
+		} else if (horizontal_gradient[j] > max && dir == 1) {
+			(*line) = j;
+			max = horizontal_gradient[j];
+			(*nb_lines) = 1;
+		}
+	}
+
+}
+
+//Goal detect nb_seeds line seeds
+void detect_seed(Mat & img, curve * l, point ** pts, int * nb_pts, int nb_seeds,
+		int * seed_dir) {
+	int i_line, i_seed;
+	unsigned int overlap;
+	unsigned int block_width = (img.cols / nb_seeds);
+	overlap = block_width / 2;
+	block_width += overlap;
+	int block_start = 0, block_stop =
+			(block_start + (block_width - overlap / 2));
+	block_stop = block_stop >= img.cols ? img.cols - 1 : block_stop;
+	//unsigned int block_start = 0, block_stop = img.cols;
+	int * sampled_lines = (int *) malloc(img.cols * sizeof(int));
+	for (i_seed = 0; i_seed < nb_seeds; i_seed++) {
+		nb_pts[i_seed] = 0;
+		for (i_line = 0; i_line < NB_LINES_HORIZ_SAMPLING; i_line++) {
+			kernel_horiz(img, sampled_lines, posv_samples_cam[i_line],
+					block_start, block_stop);
+			float line_pos;
+			int nb_lines = 1;
+			extract_thin_line_pos(sampled_lines, block_start, block_stop,
+					&line_pos, &nb_lines, seed_dir[i_seed]);
+			if (nb_lines > 0) {
+				pts[i_seed][nb_pts[i_seed]].x = line_pos;
+				pts[i_seed][nb_pts[i_seed]].y = posv_samples_cam[i_line];
+				nb_pts[i_seed]++;
+			}
+		}
+		for (i_line = 0; i_line < nb_pts[i_seed]; i_line++) { //should not undistort now ...
+			undistort_radial(K, pts[i_seed][i_line].x, pts[i_seed][i_line].y,
+					&(pts[i_seed][i_line].x), &(pts[i_seed][i_line].y),
+					radial_undistort, POLY_UNDISTORT_SIZE);
+			pixel_to_ground_plane(cam_ct, pts[i_seed][i_line].x,
+					pts[i_seed][i_line].y, &(pts[i_seed][i_line].x),
+					&(pts[i_seed][i_line].y));
+		}
+		fit_line(pts[i_seed], nb_pts[i_seed], &(l[i_seed]));
+		block_start += (img.cols / nb_seeds) - (overlap / 2);
+		block_stop = block_start + block_width;
+		block_stop = block_stop >= img.cols ? img.cols - 1 : block_stop;
+	}
+
+}
+
+void detect_line_from_seeds(Mat & img, curve * l, point ** pts, int * nb_pts,
+		int nb_seeds, int * seed_dir, float * confidences) {
+	int i, i_seed;
+	int * sampled_lines = (int *) malloc(img.cols * sizeof(int));
+	srand(time(NULL));
+	for (i_seed = 0; i_seed < nb_seeds; i_seed++) {
+		if (nb_pts[i_seed] > ((POLY_LENGTH * 2.0) - 1)) {
+			float confidence = fit_line(pts[i_seed], nb_pts[i_seed],
+					&(l[i_seed]));
+			for (i = NB_LINES_HORIZ_SAMPLING; i < NB_LINES_SAMPLED; i++) {
+				float u, v;
+				//float old_l_max_x = l->max_x;
+				float y = poly_deriv_at(&(l[i_seed]),
+						(l[i_seed].max_x - SAMPLE_SPACING_MM),
+						((i + 1) * SAMPLE_SPACING_MM));
+				ground_plane_to_pixel(cam_ct, ((i + 1) * SAMPLE_SPACING_MM), y,
+						&u, &v);
+				if (u < 1 || u >= img.cols || v < 1 || v >= img.rows)
+					break;
+
+				kernel_horiz(img, sampled_lines, v, u - 50, u + 50);
+				float line_pos;
+				int nb_lines = 1;
+				extract_thin_line_pos(sampled_lines, u - 50, u + 50, &line_pos,
+						&nb_lines, seed_dir[i_seed]);
+				if (nb_lines > 0) {
+					undistort_radial(K, line_pos, v,
+							&(pts[i_seed][nb_pts[i_seed]].x),
+							&(pts[i_seed][nb_pts[i_seed]].y), radial_undistort,
+							POLY_UNDISTORT_SIZE);
+					pixel_to_ground_plane(cam_ct, pts[i_seed][nb_pts[i_seed]].x,
+							pts[i_seed][nb_pts[i_seed]].y,
+							&(pts[i_seed][nb_pts[i_seed]].x),
+							&(pts[i_seed][nb_pts[i_seed]].y));
+					nb_pts[i_seed]++;
+					confidence = fit_line(pts[i_seed], nb_pts[i_seed],
+							&(l[i_seed]));
+				} else {
+					break;
+				}
+			}
+			confidences[i_seed] = confidence;
+		} else {
+			confidences[i_seed] = 0.;
+		}
+	}
+	free(sampled_lines);
 }
 
 float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
@@ -261,7 +381,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 			initial_search_stop_u = initial_search_start_u;
 			initial_search_start_u = temp;
 		}
-		if (initial_search_stop_u >= img.cols)
+		if (initial_search_stop_u >= ((unsigned int) img.cols))
 			initial_search_stop_u = img.cols;
 		//compute curve position at first sample
 		//limit search space {initial_search_start_u, initial_search_stop_u}
@@ -271,7 +391,7 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 				initial_search_start_u, initial_search_stop_u);
 		float line_pos;
 		int nb_lines = 1;
-		extract_line_pos(sampled_lines, initial_search_start_u,
+		extract_wide_line_pos(sampled_lines, initial_search_start_u,
 				initial_search_stop_u, &line_pos, &nb_lines);
 		if (nb_lines > 0) {
 			pts[(*nb_pts)].x = line_pos;
@@ -291,16 +411,18 @@ float detect_line(Mat & img, curve * l, point * pts, int * nb_pts, int track) {
 		float confidence = fit_line(pts, (*nb_pts), l);
 		for (i = NB_LINES_HORIZ_SAMPLING; i < NB_LINES_SAMPLED; i++) {
 			float u, v;
-			float old_l_max_x = l->max_x;
+			//float old_l_max_x = l->max_x;
 			float y = poly_deriv_at(l, (l->max_x - SAMPLE_SPACING_MM),
-					(i * SAMPLE_SPACING_MM));
-			ground_plane_to_pixel(cam_ct, (i * SAMPLE_SPACING_MM), y, &u, &v);
+					((i + 1) * SAMPLE_SPACING_MM));
+			ground_plane_to_pixel(cam_ct, ((i + 1) * SAMPLE_SPACING_MM), y, &u,
+					&v);
 			if (u < 0 || u >= img.cols || v < 0 || v >= img.rows)
 				break;
+
 			kernel_horiz(img, sampled_lines, v, u - 50, u + 50);
 			float line_pos;
 			int nb_lines = 1;
-			extract_line_pos(sampled_lines, u - 50, u + 50, &line_pos,
+			extract_wide_line_pos(sampled_lines, u - 50, u + 50, &line_pos,
 					&nb_lines);
 			if (nb_lines > 0) {
 				undistort_radial(K, line_pos, v, &(pts[(*nb_pts)].x),
@@ -357,9 +479,92 @@ void close_line_detector() {
 	free(max_inliers);
 }
 
+void draw_curve(Mat img, curve detected) {
+	float x;
+	float u, v ;
+	unsigned int i ;
+	for (x = detected.min_x; x <= detected.max_x; x += 0.1) {
+		float resp = 0.;
+		for (i = 0; i < POLY_LENGTH; i++) {
+			resp += detected.p[i] * pow(x, i);
+		}
+		ground_plane_to_pixel(cam_ct, (double) x, (double) resp, &u, &v);
+		distort_radial(K, u, v, &u, &v, radial_distort, POLY_DISTORT_SIZE);
+		if (u > img.cols || u < 0 || v > img.rows || v < 0)
+			break;
+		circle(img, Point((int) u, (int) v), 1, Scalar(0, 255, 0, 0), 1, 8,
+				0);
+	}
+}
+
+
+#define NB_SEEDS 2
+int detect_seed_test(int argc, char ** argv) {
+	int i;
+	int nb_pts[NB_SEEDS];
+	int seed_dir[NB_SEEDS] = { 1, -1 };
+	float confidences[NB_SEEDS];
+	int image_index = 0;
+	float x, y, u, v, y_lookahead, speed_factor, curvature;
+	curve detected[NB_SEEDS];
+	point * pts[NB_SEEDS];
+	for (i = 0; i < NB_SEEDS; i++) {
+		pts[i] = (point *) malloc(NB_LINES_SAMPLED * sizeof(point));
+	}
+	if (argc < 2) {
+		printf("Requires image path \n");
+		exit(-1);
+	}
+	char * image_path = (char *) malloc(256); //
+	init_line_detector();
+	while (1) {
+		Mat line_image;
+		sprintf(image_path, argv[1], image_index);
+		line_image = imread(image_path, IMREAD_GRAYSCALE);
+		/*Mat blur_image(line_image.rows, line_image.cols,
+		CV_8UC1, Scalar(0));
+		blur(line_image, blur_image, Size(5, 5), Point(-1, -1));*/
+		Mat blur_image = line_image ;
+		if (line_image.data == NULL)
+			break;
+		Mat map_image(480*2, 480*3,
+		CV_8UC1, Scalar(255));
+		Mat view_img(line_image.cols, line_image.rows, CV_8UC3);
+		cvtColor(blur_image, view_img, CV_GRAY2RGB);
+		detect_seed(blur_image, (curve *) detected, pts, nb_pts, NB_SEEDS,
+				seed_dir);
+		detect_line_from_seeds(blur_image, detected, pts, nb_pts, NB_SEEDS,
+				seed_dir, confidences);
+		for (i = 0; i < NB_SEEDS; i++) {
+
+			for (int j = 0; j < nb_pts[i]; j++) {
+				ground_plane_to_pixel(cam_ct, (double) pts[i][j].x,
+						(double) pts[i][j].y, &u, &v);
+				distort_radial(K, u, v, &u, &v, radial_distort,
+				POLY_DISTORT_SIZE);
+				circle(view_img, Point((int) u, (int) v), 1,
+						Scalar(0, 0, 255, 0), 4, 8, 0);
+
+				circle(map_image,
+						Point(pts[i][j].x*0.2, (pts[i][j].y*0.2 + map_image.cols / 2)),
+						1, Scalar(0, 0, 0, 0), 4, 8, 0);
+			}
+			draw_curve(view_img, detected[i]);
+		}
+
+		imshow("orig", view_img);
+		imshow("map", map_image);
+		waitKey(0);
+		image_index++;
+	}
+	return 0;
+}
+
+
+
 int detect_line_test(int argc, char ** argv) {
 	int i, nb_pts;
-	int image_index = 0 ;
+	int image_index = 0;
 	float x, y, u, v, y_lookahead, speed_factor, curvature;
 	curve detected;
 	point pts[NB_LINES_SAMPLED];
@@ -373,15 +578,19 @@ int detect_line_test(int argc, char ** argv) {
 		Mat line_image;
 		sprintf(image_path, argv[1], image_index);
 		line_image = imread(image_path, IMREAD_GRAYSCALE);
-		if(line_image.data == NULL) break ;
+		Mat blur_image(line_image.rows, line_image.cols,
+		CV_8UC1, Scalar(0));
+		blur(line_image, blur_image, Size(5, 5), Point(-1, -1));
+		if (line_image.data == NULL)
+			break;
 		Mat map_image(480, 480,
 		CV_8UC1, Scalar(255));
 		Mat view_img(line_image.cols, line_image.rows, CV_8UC3);
-		cvtColor(line_image, view_img, CV_GRAY2RGB);
+		cvtColor(blur_image, view_img, CV_GRAY2RGB);
 		tic
 		;
 		//for (i = 0; i < 1000; i++) {
-		detect_line(line_image, &detected, pts, &nb_pts, 0);
+		detect_line(blur_image, &detected, pts, &nb_pts, 0);
 //		detect_line(line_image, &detected, pts, &nb_pts, 1); //now track
 		//}
 		toc
@@ -397,7 +606,7 @@ int detect_line_test(int argc, char ** argv) {
 					1, Scalar(0, 0, 0, 0), 4, 8, 0);
 		}
 
-		for (x = detected.min_x; x <= detected.max_x ; x += 0.1) {
+		for (x = detected.min_x; x <= detected.max_x; x += 0.1) {
 			float resp = 0.;
 			for (i = 0; i < POLY_LENGTH; i++) {
 				resp += detected.p[i] * pow(x, i);
@@ -428,6 +637,7 @@ int detect_line_test(int argc, char ** argv) {
 		imshow("orig", view_img);
 		imshow("map", map_image);
 		waitKey(0);
-		image_index ++ ;
+		image_index++;
 	}
+	return 0;
 }
